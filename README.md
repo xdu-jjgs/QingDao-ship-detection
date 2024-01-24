@@ -1,6 +1,6 @@
 # 青岛船舶检测
 
-## 一、导出模拟视频
+## 一、导出标注视频
 
 1. 从[百度云盘](https://pan.baidu.com/s/1ydiEr7jeWDdf8_r1tYIL5w?pwd=1234)下载图片数据集
 2. 将数据集调整为如下所示的目录结构
@@ -55,7 +55,7 @@
     $ python server.py
     ```
 
-## 三、测试流媒体 API
+## 三、测试：光电实时监控 API
 
 1. 将 `input1.mp4` 模拟为光电设备视频流
     ```shell
@@ -74,7 +74,7 @@
     ```
 4. 使用 VLC、ffplay 等工具播放 `rtsp://127.0.0.1:8554/output`，视频流正常
 
-## 四、测试文件 API
+## 四、测试：光电视频回放 API
 
 1. 发起 HTTP GET 请求
     ```shell

@@ -13,7 +13,7 @@ app = Flask(__name__)
 model = DetectionModel('./yolov5s.pt')
 
 
-'''流媒体推理接口'''
+'''光电实时监控 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
     data = request.json
@@ -77,7 +77,7 @@ def fetchAnnotatedStream():
     return jsonify(responseData)
 
 
-'''视频文件推理接口'''
+'''光电视频回放 API'''
 @app.route('/api/ai/fetchAnnotatedMp4', methods=['GET'])
 def fetchAnnotatedMp4():
     data = request.json
