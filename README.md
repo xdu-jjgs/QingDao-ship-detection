@@ -63,13 +63,13 @@
     ```
 2. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedStream -d '{ "rtspURL": "rtsp://127.0.0.1:8554/input" }' -H 'Content-Type: application/json'
+    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedStream -d '{ "rtsp_url": "rtsp://127.0.0.1:8554/input" }' -H 'Content-Type: application/json'
     ```
 3. 收到 HTTP 响应
     ```json
     {
       "code": 200,
-      "rtspURL": "rtsp://127.0.0.1:8554/output"
+      "rtsp_url": "rtsp://127.0.0.1:8554/output"
     }
     ```
 4. 使用 VLC、ffplay 等工具播放 `rtsp://127.0.0.1:8554/output`，视频流正常
@@ -78,13 +78,13 @@
 
 1. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4 -d '{ "mp4Path": "/Users/zxj/Documents/QingDao-ship-detection/static/input1.mp4" }' -H 'Content-Type: application/json'
+    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4 -d '{ "mp4_path": "/Users/zxj/Documents/QingDao-ship-detection/static/input1.mp4" }' -H 'Content-Type: application/json'
     ```
 2. 收到 HTTP 响应
     ```json
     {
       "code": 200,
-      "mp4Path": "/Users/zxj/Documents/QingDao-ship-detection/output.mp4"
+      "m3u8_url": "http://127.0.0.1:5000/static/output.m3u8"
     }
     ```
-3. 使用视频播放器播放 `/Users/zxj/Documents/QingDao-ship-detection/output.mp4`，视频文件正常
+3. 使用 VLC、IINA 等工具播放 `http://127.0.0.1:5000/static/output.m3u8`，视频流正常

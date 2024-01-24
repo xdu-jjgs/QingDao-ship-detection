@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify
 from model import DetectionModel
 
 
+host = '127.0.0.1'
+port = 5000
 app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5s.pt')
 
@@ -16,15 +18,14 @@ model = DetectionModel('./yolov5s.pt')
 '''光电实时监控 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
-    data = request.json
-    srcRtspURL = data.get('rtspURL')
-    dstRtspURL= 'rtsp://127.0.0.1:8554/output'
-    print(srcRtspURL)
+    d_req = request.json
+    src_rtsp_url = d_req.get('rtsp_url')
+    dst_rtsp_url= 'rtsp://127.0.0.1:8554/output'
 
-    def infer(srcRtspURL: str, dstRtspURL: str):
+    def infer(src_rtsp_url: str, dst_rtsp_url: str):
         logging.debug('模型推理中...')
 
-        # cap = cv2.VideoCapture(srcRtspURL)
+        # cap = cv2.VideoCapture(src_rtsp_url)
         cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -34,19 +35,17 @@ def fetchAnnotatedStream():
 
         cmd = [
             'ffmpeg',
-            '-y',
-            '-f', 'rawvideo',
-            '-s', f'{w}x{h}',
-            '-pix_fmt', 'bgr24',
-            '-r', f'{fps}',
-            '-i', '-',
-            '-pix_fmt', 'yuv420p',
-            '-c:v', 'libx264',
-            '-bufsize', '64M',
-            '-maxrate', '4M',
-            # '-rtsp_transport', 'tcp',
-            '-f', 'rtsp',
-            dstRtspURL,
+            '-f', 'rawvideo', # input format
+            '-s', f'{w}x{h}', # size
+            '-pix_fmt', 'bgr24', # pixel format
+            '-r', f'{fps}', # frame rate
+            '-i', '-', # input
+            '-pix_fmt', 'yuv420p', # pixel format
+            '-c:v', 'libx264', # video codec
+            '-bufsize', '64M', # buffer size
+            '-maxrate', '4M', # max code rate
+            '-f', 'rtsp', # output format
+            dst_rtsp_url,
         ]
         pipe = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
@@ -63,31 +62,36 @@ def fetchAnnotatedStream():
 
             pipe.stdin.write(frame.tobytes())
 
+        cap.release()
+        pipe.stdin.close()
+        pipe.wait()
+
         logging.debug('模型推理完成')
         return
 
     # 新线程调用
-    t = threading.Thread(target=infer, args=(srcRtspURL, dstRtspURL))
+    t = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
     t.start()
 
-    responseData = {
+    d_rsp = {
         'code': 200,
-        'rtspURL': dstRtspURL
+        'rtsp_url': dst_rtsp_url,
     }
-    return jsonify(responseData)
+    return jsonify(d_rsp)
 
 
 '''光电视频回放 API'''
 @app.route('/api/ai/fetchAnnotatedMp4', methods=['GET'])
 def fetchAnnotatedMp4():
-    data = request.json
-    srcMp4Path = data.get('mp4Path')
-    dstMp4Path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output.mp4')
+    d_req = request.json
+    src_mp4_path = d_req.get('mp4_path')
+    dst_m3u8_name = 'output.m3u8'
+    dst_m3u8_url = f'http://{host}:{port}/{dst_m3u8_name}'
 
-    def infer(srcMp4Path: str, dstMp4Path: str):
+    def infer(src_mp4_path: str, dst_m3u8_name: str):
         logging.debug('模型推理中...')
 
-        # cap = cv2.VideoCapture(srcMp4Path)
+        # cap = cv2.VideoCapture(src_mp4_path)
         cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -95,8 +99,24 @@ def fetchAnnotatedMp4():
         # fps = int(cap.get(cv2.CAP_PROP_FPS))
         fps = 5
 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        writer = cv2.VideoWriter(dstMp4Path, fourcc, fps, (w, h))
+        cmd = [
+            'ffmpeg',
+            '-f', 'rawvideo', # input format
+            '-s', f'{w}x{h}', # size
+            '-pix_fmt', 'bgr24', # pixel format
+            '-r', f'{fps}', # frame rate
+            '-i', '-', # input
+            '-pix_fmt', 'yuv420p', # pixel format
+            '-c:v', 'libx264', # video codec
+            '-bufsize', '64M', # buffer size
+            '-maxrate', '4M', # max code rate
+            '-f', 'segment', # output format
+            '-hls_time', '1',
+            '-segment_list', os.path.join('static', dst_m3u8_name),
+            '-segment_format', 'mpegts',
+            'static/output_%03d.ts',
+        ]
+        pipe = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
         while True:
             ret, frame = cap.read()
@@ -109,23 +129,26 @@ def fetchAnnotatedMp4():
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
             '''
 
-            writer.write(frame)
+            pipe.stdin.write(frame.tobytes())
 
-        writer.release()
+        cap.release()
+        pipe.stdin.close()
+        pipe.wait()
 
         logging.debug('模型推理完成')
         return
 
-    # 阻塞调用
-    infer(srcMp4Path, dstMp4Path)
+    # 新线程调用
+    t = threading.Thread(target=infer, args=(src_mp4_path, dst_m3u8_name))
+    t.start()
 
-    responseData = {
+    d_rsp = {
         'code': 200,
-        'mp4Path': dstMp4Path
+        'm3u8_url': dst_m3u8_url,
     }
-    return jsonify(responseData)
+    return jsonify(d_rsp)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(message)s')
-    app.run(debug=True)
+    app.run(host=host, port=port, debug=True)
