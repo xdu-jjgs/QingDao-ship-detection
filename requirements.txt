@@ -1,0 +1,5 @@
+flask
+opencv-python
+numpy
+pillow
+tqdm
