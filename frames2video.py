@@ -21,6 +21,8 @@ if __name__ == '__main__':
     video_path = args.video
     video_fps = args.fps
 
+    if not os.path.exists(frames_path):
+        raise FileNotFoundError(frames_path)
     frame_names = os.listdir(frames_path)
     frame_names.sort()
     print(f'number of frames: {len(frame_names)}')
@@ -32,6 +34,8 @@ if __name__ == '__main__':
     print(f'resolution: {video_w}x{video_h}')
     print(f'fps: {video_fps}')
 
+    if not os.path.exists(os.path.dirname(video_path)):
+        os.makedirs(os.path.dirname(video_path))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     writer = cv2.VideoWriter(video_path, fourcc, video_fps, (video_w, video_h))
 
@@ -39,12 +43,14 @@ if __name__ == '__main__':
         for frame_path in tqdm(frame_paths):
             frame = cv2.imread(frame_path)
             if frame is None:
-                print(f'warning: {frame_path} is not an image')
+                print(f'warning: {frame_path} is not a valid image')
                 continue
 
             writer.write(frame)
         writer.release()
     else:
+        if not os.path.exists(labels_path):
+            raise FileNotFoundError(labels_path)
         label_names = os.listdir(labels_path)
         label_names.sort()
         label_paths = [os.path.join(labels_path, label_name) for label_name in label_names]
@@ -53,7 +59,7 @@ if __name__ == '__main__':
         for frame_path, label_path in tqdm(list(zip(frame_paths, label_paths))):
             frame = cv2.imread(frame_path)
             if frame is None:
-                print(f'warning: {frame_path} is not an image')
+                print(f'warning: {frame_path} is not a valid image')
                 continue
 
             label_file = open(label_path, mode='r')
