@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify
 from model import DetectionModel
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5s.pt')
 
 
@@ -25,7 +25,7 @@ def fetchAnnotatedStream():
         logging.debug('模型推理中...')
 
         # cap = cv2.VideoCapture(srcRtspURL)
-        cap = cv2.VideoCapture('./output1.mp4')
+        cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -88,7 +88,7 @@ def fetchAnnotatedMp4():
         logging.debug('模型推理中...')
 
         # cap = cv2.VideoCapture(srcMp4Path)
-        cap = cv2.VideoCapture('./output2.mp4')
+        cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))

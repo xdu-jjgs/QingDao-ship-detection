@@ -35,12 +35,12 @@
     ```
 3. 执行以下脚本，将数据集中的图像帧导出为视频
     ```shell
-    $ python frames2video.py --frames data/images/12.1_n/ --video input1.mp4
-    $ python frames2video.py --frames data/images/12.1_n/ --labels data/labels/12.1_n_yolo/ --video output1.mp4
-    $ python frames2video.py --frames data/images/12.1_w/ --video input2.mp4
-    $ python frames2video.py --frames data/images/12.1_w/ --labels data/labels/12.1_w_yolo/ --video output2.mp4
-    $ python frames2video.py --frames data/images/12.6_n/ --video input3.mp4
-    $ python frames2video.py --frames data/images/12.6_n/ --labels data/labels/12.6_n_yolo/ --video output3.mp4
+    $ python frames2video.py --frames data/images/12.1_n/ --video static/input1.mp4
+    $ python frames2video.py --frames data/images/12.1_n/ --labels data/labels/12.1_n_yolo/ --video static/output1.mp4
+    $ python frames2video.py --frames data/images/12.1_w/ --video static/input2.mp4
+    $ python frames2video.py --frames data/images/12.1_w/ --labels data/labels/12.1_w_yolo/ --video static/output2.mp4
+    $ python frames2video.py --frames data/images/12.6_n/ --video static/input3.mp4
+    $ python frames2video.py --frames data/images/12.6_n/ --labels data/labels/12.6_n_yolo/ --video static/output3.mp4
     ```
 
 ## 二、启动服务器
@@ -59,7 +59,7 @@
 
 1. 将 `input1.mp4` 模拟为光电设备视频流
     ```shell
-    $ ffmpeg -re -stream_loop -1 -i input1.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input
+    $ ffmpeg -re -stream_loop -1 -i static/input1.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input
     ```
 2. 发起 HTTP GET 请求
     ```shell
@@ -78,7 +78,7 @@
 
 1. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4 -d '{ "mp4Path": "/Users/zxj/Documents/QingDao-ship-detection/input1.mp4" }' -H 'Content-Type: application/json'
+    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4 -d '{ "mp4Path": "/Users/zxj/Documents/QingDao-ship-detection/static/input1.mp4" }' -H 'Content-Type: application/json'
     ```
 2. 收到 HTTP 响应
     ```json
