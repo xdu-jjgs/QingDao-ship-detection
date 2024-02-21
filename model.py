@@ -2,6 +2,11 @@ from typing import List
 
 import numpy as np
 import cv2
+import torch
+from yolov5.models.experimental import attempt_load
+from yolov5.utils.general import non_max_suppression, scale_boxes
+from yolov5.utils.torch_utils import select_device
+from yolov5.utils.augmentations import letterbox
 
 
 cls2lbl = [
@@ -36,15 +41,32 @@ class BoundingBox:
 # 检测模型
 class DetectionModel:
     def __init__(self, weight: str):
-        # TODO: 初始化动作，如加载模型权重
-        pass
+        self.device = select_device('')
+        self.model = attempt_load(weight, device=self.device)
+        self.imgsz = 1280
+        self.score_thres = 0.25
+        self.iou_thres = 0.3
 
     def __call__(self, img: np.ndarray) -> List[BoundingBox]:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # TODO: 模型推理
+        img_processed = letterbox(img, self.imgsz, stride=32)[0]
+        img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
+        img_processed = img_processed.unsqueeze(0) / 255.
 
-        return [
-            BoundingBox(100, 100, 400, 400, 0.95, 0),
-            BoundingBox(300, 400, 300, 300, 0.73, 1),
-        ]
+        pred = self.model(img_processed, augment=False)[0]
+        pred = non_max_suppression(pred, self.score_thres, self.iou_thres)
+
+        bboxes = []
+        for results in pred:
+            if len(results) == 0: continue
+
+            results = results.cpu().numpy()
+            results[:, :4] = scale_boxes(img_processed.shape[2:], results[:, :4], img.shape).round()
+            for result in results:
+                x0, y0, x1, y1 = round(result[0]), round(result[1]), round(result[2]), round(result[3])
+                score = result[4]
+                cls = int(result[5])
+                bbox = BoundingBox(x0, y0, x1 - x0, y1 - y0, score, cls)
+                bboxes.append(bbox)
+        return bboxes

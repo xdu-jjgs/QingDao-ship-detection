@@ -12,7 +12,7 @@ from model import DetectionModel
 host = '127.0.0.1'
 port = 5000
 app = Flask(__name__, static_folder='static', static_url_path='/')
-model = DetectionModel('./yolov5s.pt')
+model = DetectionModel('./yolov5m6.pt')
 
 
 '''光电实时监控 API'''
@@ -25,8 +25,8 @@ def fetchAnnotatedStream():
     def infer(src_rtsp_url: str, dst_rtsp_url: str):
         logging.debug('模型推理中...')
 
-        # cap = cv2.VideoCapture(src_rtsp_url)
-        cap = cv2.VideoCapture('./static/output1.mp4')
+        cap = cv2.VideoCapture(src_rtsp_url)
+        # cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -53,12 +53,10 @@ def fetchAnnotatedStream():
             ret, frame = cap.read()
             if not ret: break
 
-            '''
-            bboxs = model(frame)
-            for bbox in bboxs:
+            bboxes = model(frame)
+            for bbox in bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
-            '''
 
             pipe.stdin.write(frame.tobytes())
 
@@ -91,8 +89,8 @@ def fetchAnnotatedMp4():
     def infer(src_mp4_path: str, dst_m3u8_name: str):
         logging.debug('模型推理中...')
 
-        # cap = cv2.VideoCapture(src_mp4_path)
-        cap = cv2.VideoCapture('./static/output1.mp4')
+        cap = cv2.VideoCapture(src_mp4_path)
+        # cap = cv2.VideoCapture('./static/output1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -122,12 +120,10 @@ def fetchAnnotatedMp4():
             ret, frame = cap.read()
             if not ret: break
 
-            '''
-            bboxs = model(frame)
-            for bbox in bboxs:
+            bboxes = model(frame)
+            for bbox in bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
-            '''
 
             pipe.stdin.write(frame.tobytes())
 
