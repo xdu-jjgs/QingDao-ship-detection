@@ -5,17 +5,17 @@ import cv2
 
 
 cls2lbl = [
-    '渔船',
-    '集装箱船',
-    '散货船',
-    '快艇',
-    '油气船',
-    '其他船只',
-    '拖轮',
-    '公务船',
-    '军舰',
-    '客滚船',
-    '游轮',
+    'Fishing_Vessel',
+    'Container_Ship',
+    'Bulk_Carrier',
+    'Speedboat',
+    'Oil_Gas_Vessel',
+    'Other_Vessels',
+    'Tugboats',
+    'Public_Service_Vessels',
+    'Warships',
+    'Roll-on_Roll-off_Ship',
+    'Cruise_Ship',
 ]
 
 

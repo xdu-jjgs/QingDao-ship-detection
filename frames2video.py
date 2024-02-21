@@ -77,13 +77,13 @@ if __name__ == '__main__':
 
                 cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 0, 255), 5)
 
-                # cv2.putText(frame, lbl, (x0, y0 - 2), 0, 1, (255, 255, 255), 3)
+                cv2.putText(frame, lbl, (x0, y0 - 2), 0, 1, (255, 255, 255), 3)
                 # 中文支持
-                img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                draw = ImageDraw.Draw(img)
-                font = ImageFont.truetype('Songti.ttc', 30, encoding='utf-8')
-                draw.text((x0, y0 - 35), lbl, (255, 255, 255), font=font)
-                frame = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+                # img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                # draw = ImageDraw.Draw(img)
+                # font = ImageFont.truetype('Songti.ttc', 30, encoding='utf-8')
+                # draw.text((x0, y0 - 35), lbl, (255, 255, 255), font=font)
+                # frame = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
 
             writer.write(frame)
         writer.release()
