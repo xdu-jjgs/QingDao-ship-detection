@@ -1,5 +1,12 @@
 # 青岛船舶检测
 
+## 零、环境要求
+
+- 性能较强的多核 CPU，主要用于 ffmpeg 推流
+- 安装 [ffmpeg](https://ffmpeg.org/)
+- 性能较强的一到多个 Nvidia GPU，主要用于目标检测模型推理
+- 安装 [CUDA](https://developer.nvidia.com/cuda-downloads)
+
 ## 一、导出标注视频
 
 1. 从[百度云盘](https://pan.baidu.com/s/1ydiEr7jeWDdf8_r1tYIL5w?pwd=1234)下载图片数据集
