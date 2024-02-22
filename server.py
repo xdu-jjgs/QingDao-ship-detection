@@ -15,18 +15,19 @@ app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5m6.pt')
 
 
-'''光电实时监控 API'''
+rtsp_thread = None
+'''光电实时监控-开始推流 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
     d_req = request.json
     src_rtsp_url = d_req.get('rtsp_url')
-    dst_rtsp_url= 'rtsp://127.0.0.1:8554/output'
+    dst_rtsp_url = 'rtsp://127.0.0.1:8554/output'
 
     def infer(src_rtsp_url: str, dst_rtsp_url: str):
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_rtsp_url)
-        # cap = cv2.VideoCapture('./static/output1.mp4')
+        # cap = cv2.VideoCapture('./static/input1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -68,14 +69,32 @@ def fetchAnnotatedStream():
         return
 
     # 新线程调用
-    t = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
-    t.start()
+    if rtsp_thread is None:
+        rtsp_thread = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
+        rtsp_thread.start()
 
     d_rsp = {
         'code': 200,
         'rtsp_url': dst_rtsp_url,
     }
     return jsonify(d_rsp)
+
+
+'''光电实时监控-停止推流 API'''
+@app.route('/api/ai/terminateAnnotatedStream', methods=['GET'])
+def terminateAnnotatedStream():
+    if rtsp_thread is not None:
+        rtsp_thread.stop()
+        logging.debug('模型推理终止')
+        d_rsp = {
+            'code': 200,
+        }
+        return jsonify(d_rsp)
+    else:
+        d_rsp = {
+            'code': 500,
+        }
+        return jsonify(d_rsp)
 
 
 '''光电视频回放 API'''
@@ -90,7 +109,7 @@ def fetchAnnotatedMp4():
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_mp4_path)
-        # cap = cv2.VideoCapture('./static/output1.mp4')
+        # cap = cv2.VideoCapture('./static/input1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
