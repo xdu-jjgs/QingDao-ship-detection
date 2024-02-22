@@ -26,6 +26,8 @@ def fetchAnnotatedStream():
     dst_rtsp_url = 'rtsp://127.0.0.1:8554/output'
 
     def infer(src_rtsp_url: str, dst_rtsp_url: str):
+        global rtsp_thread_running
+
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_rtsp_url)
