@@ -55,7 +55,7 @@
     $ python server.py
     ```
 
-## 三、测试：光电实时监控 API
+## 三、测试：光电实时监控-开始推流 API
 
 1. 将 `input1.mp4` 模拟为光电设备视频流
     ```shell
@@ -74,7 +74,20 @@
     ```
 4. 使用 VLC、ffplay 等工具播放 `rtsp://127.0.0.1:8554/output`，视频流正常
 
-## 四、测试：光电视频回放 API
+## 四、测试：光电实时监控-停止推流 API
+
+1. 发起 HTTP GET 请求
+    ```shell
+    $ curl -X GET http://127.0.0.1:5000/api/ai/terminateAnnotatedStream
+    ```
+2. 收到 HTTP 响应，同时服务器停止推流
+    ```json
+    {
+      "code": 200,
+    }
+    ```
+
+## 五、测试：光电视频回放 API
 
 1. 发起 HTTP GET 请求
     ```shell
