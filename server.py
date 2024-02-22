@@ -29,12 +29,10 @@ def fetchAnnotatedStream():
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_rtsp_url)
-        # cap = cv2.VideoCapture('./static/input1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # fps = int(cap.get(cv2.CAP_PROP_FPS))
-        fps = 5
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
 
         cmd = [
             'ffmpeg',
@@ -113,12 +111,10 @@ def fetchAnnotatedMp4():
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_mp4_path)
-        # cap = cv2.VideoCapture('./static/input1.mp4')
 
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        # fps = int(cap.get(cv2.CAP_PROP_FPS))
-        fps = 5
+        fps = int(cap.get(cv2.CAP_PROP_FPS))
 
         cmd = [
             'ffmpeg',
