@@ -15,11 +15,11 @@ app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5m6.pt')
 
 
-rtsp_thread = None
+rtsp_thread_running = False
 '''光电实时监控-开始推流 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
-    global rtsp_thread
+    global rtsp_thread_running
 
     d_req = request.json
     src_rtsp_url = d_req.get('rtsp_url')
@@ -50,7 +50,7 @@ def fetchAnnotatedStream():
         ]
         pipe = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
-        while True:
+        while rtsp_thread_running:
             ret, frame = cap.read()
             if not ret: break
 
@@ -65,11 +65,12 @@ def fetchAnnotatedStream():
         pipe.stdin.close()
         pipe.wait()
 
-        logging.debug('模型推理完成')
+        logging.debug('模型推理结束')
         return
 
     # 新线程调用
-    if rtsp_thread is None:
+    if not rtsp_thread_running:
+        rtsp_thread_running = True
         rtsp_thread = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
         rtsp_thread.start()
 
@@ -83,11 +84,10 @@ def fetchAnnotatedStream():
 '''光电实时监控-停止推流 API'''
 @app.route('/api/ai/terminateAnnotatedStream', methods=['GET'])
 def terminateAnnotatedStream():
-    global rtsp_thread
+    global rtsp_thread_running
 
-    if rtsp_thread is not None:
-        rtsp_thread.stop()
-        logging.debug('模型推理终止')
+    if rtsp_thread_running:
+        rtsp_thread_running = False
         d_rsp = {
             'code': 200,
         }
