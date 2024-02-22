@@ -43,8 +43,6 @@ def fetchAnnotatedStream():
             '-i', '-', # input
             '-pix_fmt', 'yuv420p', # pixel format
             '-c:v', 'libx264', # video codec
-            '-bufsize', '64M', # buffer size
-            '-maxrate', '4M', # max code rate
             '-f', 'rtsp', # output format
             dst_rtsp_url,
         ]
@@ -125,8 +123,6 @@ def fetchAnnotatedMp4():
             '-i', '-', # input
             '-pix_fmt', 'yuv420p', # pixel format
             '-c:v', 'libx264', # video codec
-            '-bufsize', '64M', # buffer size
-            '-maxrate', '4M', # max code rate
             '-f', 'segment', # output format
             '-hls_time', '1',
             '-segment_list', os.path.join('static', dst_m3u8_name),
