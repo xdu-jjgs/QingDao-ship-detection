@@ -9,6 +9,12 @@ from yolov5.utils.torch_utils import select_device
 from yolov5.utils.augmentations import letterbox
 
 
+import platform
+if platform.system() == 'Windows':
+    import pathlib
+    pathlib.PosixPath = pathlib.WindowsPath
+
+
 cls2lbl = [
     'Fishing_Vessel',
     'Container_Ship',
