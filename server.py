@@ -52,7 +52,9 @@ def fetchAnnotatedStream():
 
         while rtsp_thread_running:
             ret, frame = cap.read()
-            if not ret: break
+            if not ret:
+                rtsp_thread_running = False
+                break
 
             bboxes = model(frame)
             for bbox in bboxes:
