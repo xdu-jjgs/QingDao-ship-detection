@@ -19,6 +19,8 @@ rtsp_thread = None
 '''光电实时监控-开始推流 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
+    global rtsp_thread
+
     d_req = request.json
     src_rtsp_url = d_req.get('rtsp_url')
     dst_rtsp_url = 'rtsp://127.0.0.1:8554/output'
@@ -81,6 +83,8 @@ def fetchAnnotatedStream():
 '''光电实时监控-停止推流 API'''
 @app.route('/api/ai/terminateAnnotatedStream', methods=['GET'])
 def terminateAnnotatedStream():
+    global rtsp_thread
+
     if rtsp_thread is not None:
         rtsp_thread.stop()
         logging.debug('模型推理终止')
