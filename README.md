@@ -35,12 +35,12 @@
     ```
 3. 执行以下脚本，将数据集中的图像帧导出为视频
     ```shell
-    $ python frames2video.py --frames data/images/12.1_n/ --video static/input1.mp4
-    $ python frames2video.py --frames data/images/12.1_n/ --labels data/labels/12.1_n_yolo/ --video static/output1.mp4
-    $ python frames2video.py --frames data/images/12.1_w/ --video static/input2.mp4
-    $ python frames2video.py --frames data/images/12.1_w/ --labels data/labels/12.1_w_yolo/ --video static/output2.mp4
-    $ python frames2video.py --frames data/images/12.6_n/ --video static/input3.mp4
-    $ python frames2video.py --frames data/images/12.6_n/ --labels data/labels/12.6_n_yolo/ --video static/output3.mp4
+    $ python frames2video.py --frames data/images/12.1_n/ --video static/input1.mp4 --fps 5
+    $ python frames2video.py --frames data/images/12.1_n/ --labels data/labels/12.1_n_yolo/ --video static/output1.mp4 --fps 5
+    $ python frames2video.py --frames data/images/12.1_w/ --video static/input2.mp4 --fps 5
+    $ python frames2video.py --frames data/images/12.1_w/ --labels data/labels/12.1_w_yolo/ --video static/output2.mp4 --fps 5
+    $ python frames2video.py --frames data/images/12.6_n/ --video static/input3.mp4 --fps 5
+    $ python frames2video.py --frames data/images/12.6_n/ --labels data/labels/12.6_n_yolo/ --video static/output3.mp4 --fps 5
     ```
 
 ## 二、启动服务器
