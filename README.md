@@ -70,12 +70,11 @@
     ```
 2. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedStream -d '{ "rtsp_url": "rtsp://127.0.0.1:8554/input" }' -H 'Content-Type: application/json'
+    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input
     ```
-3. 收到 HTTP 响应
+3. 收到 HTTP 响应（状态码 200）
     ```json
     {
-      "code": 200,
       "rtsp_url": "rtsp://127.0.0.1:8554/output"
     }
     ```
@@ -85,12 +84,11 @@
 
 1. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/terminateAnnotatedStream
+    $ curl -X GET http://127.0.0.1:5000/api/ai/terminateAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input
     ```
-2. 收到 HTTP 响应，同时服务器停止推流
+2. 收到 HTTP 响应（状态码 200），同时服务器停止推流
     ```json
     {
-      "code": 200,
     }
     ```
 
@@ -98,12 +96,11 @@
 
 1. 发起 HTTP GET 请求
     ```shell
-    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4 -d '{ "mp4_path": "/Users/zxj/Documents/QingDao-ship-detection/static/input1.mp4" }' -H 'Content-Type: application/json'
+    $ curl -X GET http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=/Users/zxj/Documents/QingDao-ship-detection/static/input1.mp4
     ```
-2. 收到 HTTP 响应
+2. 收到 HTTP 响应（状态码 200）
     ```json
     {
-      "code": 200,
       "m3u8_url": "http://127.0.0.1:5000/static/output.m3u8"
     }
     ```

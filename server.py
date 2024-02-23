@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 import os
 import subprocess
@@ -15,19 +16,15 @@ app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5m6.pt')
 
 
-rtsp_thread_running = False
+rtsp_url2running = defaultdict(lambda: False)
 '''光电实时监控-开始推流 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
 def fetchAnnotatedStream():
-    global rtsp_thread_running
-
-    d_req = request.json
+    d_req = request.args
     src_rtsp_url = d_req.get('rtsp_url')
     dst_rtsp_url = 'rtsp://127.0.0.1:8554/output'
 
     def infer(src_rtsp_url: str, dst_rtsp_url: str):
-        global rtsp_thread_running
-
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_rtsp_url)
@@ -50,10 +47,10 @@ def fetchAnnotatedStream():
         ]
         pipe = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
-        while rtsp_thread_running:
+        while rtsp_url2running[src_rtsp_url]:
             ret, frame = cap.read()
             if not ret:
-                rtsp_thread_running = False
+                rtsp_url2running[src_rtsp_url] = False
                 break
 
             bboxes = model(frame)
@@ -71,40 +68,38 @@ def fetchAnnotatedStream():
         return
 
     # 新线程调用
-    if not rtsp_thread_running:
-        rtsp_thread_running = True
+    if not rtsp_url2running[src_rtsp_url]:
+        rtsp_url2running[src_rtsp_url] = True
         rtsp_thread = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
         rtsp_thread.start()
 
     d_rsp = {
-        'code': 200,
         'rtsp_url': dst_rtsp_url,
     }
-    return jsonify(d_rsp)
+    return jsonify(d_rsp), 200, None
 
 
 '''光电实时监控-停止推流 API'''
 @app.route('/api/ai/terminateAnnotatedStream', methods=['GET'])
 def terminateAnnotatedStream():
-    global rtsp_thread_running
+    d_req = request.args
+    rtsp_url = d_req.get('rtsp_url')
 
-    if rtsp_thread_running:
-        rtsp_thread_running = False
+    if rtsp_url2running[rtsp_url]:
+        rtsp_url2running[rtsp_url] = False
         d_rsp = {
-            'code': 200,
         }
-        return jsonify(d_rsp)
+        return jsonify(d_rsp), 200, None
     else:
         d_rsp = {
-            'code': 500,
         }
-        return jsonify(d_rsp)
+        return jsonify(d_rsp), 500, None
 
 
 '''光电视频回放 API'''
 @app.route('/api/ai/fetchAnnotatedMp4', methods=['GET'])
 def fetchAnnotatedMp4():
-    d_req = request.json
+    d_req = request.args
     src_mp4_path = d_req.get('mp4_path')
     dst_m3u8_name = 'output.m3u8'
     dst_m3u8_url = f'http://{host}:{port}/{dst_m3u8_name}'
@@ -158,10 +153,9 @@ def fetchAnnotatedMp4():
     t.start()
 
     d_rsp = {
-        'code': 200,
         'm3u8_url': dst_m3u8_url,
     }
-    return jsonify(d_rsp)
+    return jsonify(d_rsp), 200, None
 
 
 if __name__ == '__main__':
