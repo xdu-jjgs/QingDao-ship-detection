@@ -1,0 +1,3 @@
+[submodule "deep-text-recognition-benchmark"]
+	path = deep-text-recognition-benchmark
+	url = https://github.com/clovaai/deep-text-recognition-benchmark
