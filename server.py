@@ -10,8 +10,10 @@ from flask import Flask, request, jsonify
 from model import DetectionModel
 
 
-host = '127.0.0.1'
-port = 5000
+http_host = '127.0.0.1'
+http_port = 5000
+rtsp_host = '127.0.0.1'
+rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
 model = DetectionModel('./yolov5m6.pt')
 
@@ -22,7 +24,7 @@ rtsp_url2running = defaultdict(lambda: False)
 def fetchAnnotatedStream():
     d_req = request.args
     src_rtsp_url = d_req.get('rtsp_url')
-    dst_rtsp_url = 'rtsp://127.0.0.1:8554/output'
+    dst_rtsp_url = f'rtsp://{rtsp_host}:{rtsp_port}/output'
 
     def infer(src_rtsp_url: str, dst_rtsp_url: str):
         logging.debug('模型推理中...')
@@ -102,7 +104,7 @@ def fetchAnnotatedMp4():
     d_req = request.args
     src_mp4_path = d_req.get('mp4_path')
     dst_m3u8_name = 'output.m3u8'
-    dst_m3u8_url = f'http://{host}:{port}/{dst_m3u8_name}'
+    dst_m3u8_url = f'http://{http_host}:{http_port}/{dst_m3u8_name}'
 
     def infer(src_mp4_path: str, dst_m3u8_name: str):
         logging.debug('模型推理中...')
@@ -160,4 +162,4 @@ def fetchAnnotatedMp4():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(message)s')
-    app.run(host=host, port=port, debug=True)
+    app.run(host=http_host, port=http_port, debug=True)
