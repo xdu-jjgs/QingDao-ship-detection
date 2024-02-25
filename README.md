@@ -6,6 +6,24 @@
 - 安装 [ffmpeg](https://ffmpeg.org/)
 - 性能较强的一到多个 Nvidia GPU，主要用于目标检测模型推理
 - 安装 [CUDA](https://developer.nvidia.com/cuda-downloads)
+- 安装 Python 3.8
+- 安装以下 Python 依赖：
+  ```shell
+  $ # frames2video.py
+  $ pip install tqdm
+  $ # HTTP 服务器
+  $ pip install flask
+  $ # 深度学习算法
+  $ pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+  $ pip install numpy opencv-python pillow
+  $ # 船舶检测模型
+  $ pip install yolov5 # https://github.com/ultralytics/yolov5
+  $ pip install dill
+  $ # 文字检测模型
+  $ pip install mmcv==2.0.0 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.10/index.html
+  $ pip install mmdet==3.1.0
+  $ pip install mmocr==1.0.1
+  ```
 
 ## 一、导出标注视频
 

@@ -1,9 +1,0 @@
-flask
-opencv-python
-numpy
-pillow
-torch
-torchvision
-tqdm
-yolov5 # https://github.com/ultralytics/yolov5
-mmocr # https://github.com/open-mmlab/mmocr
