@@ -256,11 +256,12 @@ class TextRecognitionModel:
             img_processed = letterbox(img, (32, 100))[0]
             img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
             img_processed = img_processed.unsqueeze(0) / 255.
+            img_processed = img_processed[:,0:1,:,:]
             length_for_pred = torch.IntTensor([25]).to(self.device)
             text_for_pred = torch.LongTensor(1, 26).fill_(0).to(self.device)
             preds = self.model(input=img_processed, text=text_for_pred, is_train=False)
-            _, pjeds_index = preds.max(2)
-            pred_str = converter.decode(preds_index, length_for_pred)[0]
+            _, preds_index = preds.max(2)
+            pred_str = self.converter.decode(preds_index, length_for_pred)[0]
             pred_EOS = pred_str.find('[s]')
             pred_str = pred_str[:pred_EOS]
             texts.append(pred_str)
