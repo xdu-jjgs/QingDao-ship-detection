@@ -7,7 +7,7 @@ import threading
 import cv2
 from flask import Flask, request, jsonify
 
-from model import DetectionModel
+from model import DetectionModel, TextDetectionModel, TextRecognitionModel
 
 
 http_host = '127.0.0.1'
@@ -15,7 +15,9 @@ http_port = 5000
 rtsp_host = '127.0.0.1'
 rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
-model = DetectionModel('./yolov5m6.pt')
+ship_det_model = DetectionModel('./yolov5m6.pt')
+text_det_model = TextDetectionModel('./textsnake_resnet50_fpn-unet_1200e_ctw1500_20220825_221459-c0b6adc4.pth')
+text_rec_model = TextRecognitionModel('TPS-ResNet-BiLSTM-Attn.pth')
 
 
 rtsp_url2running = defaultdict(lambda: False)
@@ -55,10 +57,20 @@ def fetchAnnotatedStream():
                 rtsp_url2running[src_rtsp_url] = False
                 break
 
-            bboxes = model(frame)
-            for bbox in bboxes:
+            ship_bboxes = ship_det_model(frame)
+            for bbox in ship_bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
+
+            text_bboxes = text_det_model(frame)
+            text_frames = []
+            for bbox in text_bboxes:
+                text_frames.append(frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1])
+
+            texts = text_rec_model(text_frames)
+            for bbox, text in zip(text_bboxes, texts):
+                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 255), 5)
+                cv2.putText(frame, text, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
 
             pipe.stdin.write(frame.tobytes())
 
@@ -136,7 +148,7 @@ def fetchAnnotatedMp4():
             ret, frame = cap.read()
             if not ret: break
 
-            bboxes = model(frame)
+            bboxes = ship_det_model(frame)
             for bbox in bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
