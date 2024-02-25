@@ -1,20 +1,4 @@
 # https://github.com/clovaai/deep-text-recognition-benchmark/blob/master/model.py
-"""
-Copyright (c) 2019-present NAVER Corp.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
-
 import torch.nn as nn
 
 from modules.transformation import TPS_SpatialTransformerNetwork
@@ -269,10 +253,12 @@ class TextRecognitionModel:
         imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
         texts = []
         for img in imgs:
-            img = torch.from_numpy(img).permute((2, 0, 1)).unsqueeze(0).to(self.device)
+            img_processed = letterbox(img, (32, 100))[0]
+            img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
+            img_processed = img_processed.unsqueeze(0) / 255.
             length_for_pred = torch.IntTensor([25]).to(self.device)
             text_for_pred = torch.LongTensor(1, 26).fill_(0).to(self.device)
-            preds = self.model(input=img, text=text_for_pred, is_train=False)
+            preds = self.model(input=img_processed, text=text_for_pred, is_train=False)
             _, pjeds_index = preds.max(2)
             pred_str = converter.decode(preds_index, length_for_pred)[0]
             pred_EOS = pred_str.find('[s]')
