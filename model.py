@@ -269,9 +269,10 @@ class TextRecognitionModel:
         imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
         texts = []
         for img in imgs:
+            img = torch.from_numpy(img).to(self.device)
             length_for_pred = torch.IntTensor([25]).to(self.device)
             text_for_pred = torch.LongTensor(1, 26).fill_(0).to(self.device)
-            preds = self.model(input=img.to(self.device), text=text_for_pred, is_train=False)
+            preds = self.model(input=img, text=text_for_pred, is_train=False)
             _, pjeds_index = preds.max(2)
             pred_str = converter.decode(preds_index, length_for_pred)[0]
             pred_EOS = pred_str.find('[s]')
