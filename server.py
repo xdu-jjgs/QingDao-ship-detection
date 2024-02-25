@@ -16,7 +16,7 @@ rtsp_host = '127.0.0.1'
 rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
 ship_det_model = DetectionModel('./yolov5m6.pt')
-text_det_model = TextDetectionModel('./textsnake_resnet50_fpn-unet_1200e_ctw1500_20220825_221459-c0b6adc4.pth')
+text_det_model = TextDetectionModel('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
 text_rec_model = TextRecognitionModel('TPS-ResNet-BiLSTM-Attn.pth')
 
 
