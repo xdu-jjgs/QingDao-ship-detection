@@ -58,16 +58,15 @@ def fetchAnnotatedStream():
                 break
 
             ship_bboxes = ship_det_model(frame)
-            for bbox in ship_bboxes:
-                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
-                cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
-
             text_bboxes = text_det_model(frame)
             text_frames = []
             for bbox in text_bboxes:
                 text_frames.append(frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1])
-
             texts = text_rec_model(text_frames)
+
+            for bbox in ship_bboxes:
+                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
+                cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
             for bbox, text in zip(text_bboxes, texts):
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 255), 5)
                 cv2.putText(frame, text, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
