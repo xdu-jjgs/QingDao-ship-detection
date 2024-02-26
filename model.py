@@ -158,8 +158,7 @@ cls2lbl = [
 ]
 
 
-# 单个检测框
-class BoundingBox:
+class ShipBoundingBox:
     def __init__(self, x: int, y: int, w: int, h: int, prob: float, cls: int):
         self.x0 = x
         self.y0 = y
@@ -172,8 +171,8 @@ class BoundingBox:
         self.lbl = cls2lbl[cls]
 
 
-# 检测模型
-class DetectionModel:
+# 船舶检测模型
+class ShipDetectionModel:
     def __init__(self, weight: str):
         self.device = select_device('')
         self.model = attempt_load(weight, device=self.device)
@@ -181,7 +180,7 @@ class DetectionModel:
         self.score_thres = 0.25
         self.iou_thres = 0.3
 
-    def __call__(self, frame: np.ndarray) -> List[BoundingBox]:
+    def __call__(self, frame: np.ndarray) -> List[ShipBoundingBox]:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img_processed = letterbox(img, self.imgsz, stride=32)[0]
         img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
@@ -200,17 +199,28 @@ class DetectionModel:
                 x0, y0, x1, y1 = round(xyxysc[0]), round(xyxysc[1]), round(xyxysc[2]), round(xyxysc[3])
                 score = xyxysc[4]
                 cls = int(xyxysc[5])
-                bbox = BoundingBox(x0, y0, x1 - x0, y1 - y0, score, cls)
+                bbox = ShipBoundingBox(x0, y0, x1 - x0, y1 - y0, score, cls)
                 bboxes.append(bbox)
         return bboxes
 
 
+class TextBoundingBox:
+    def __init__(self, x: int, y: int, w: int, h: int):
+        self.x0 = x
+        self.y0 = y
+        self.w = w
+        self.h = h
+        self.x1 = x + w
+        self.y1 = y + h
+
+
+# 文本检测模型
 class TextDetectionModel:
     def __init__(self, weight: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MMOCRInferencer(det='TextSnake', det_weights=weight, device=self.device)
 
-    def __call__(self, frame: np.ndarray) -> List[BoundingBox]:
+    def __call__(self, frame: np.ndarray) -> List[TextBoundingBox]:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         pred = self.model.textdet_inferencer(img)['predictions'][0]
@@ -222,11 +232,12 @@ class TextDetectionModel:
             x1 = np.int32(np.max(polygon[:, 0]))
             y0 = np.int32(np.min(polygon[:, 1]))
             y1 = np.int32(np.max(polygon[:, 1]))
-            bbox = BoundingBox(x0, y0, x1 - x0, y1 - y0, 1, 0)
+            bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0, 1, 0)
             bboxes.append(bbox)
         return bboxes
 
 
+# 文本识别模型
 class TextRecognitionModel:
     def __init__(self, weight: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

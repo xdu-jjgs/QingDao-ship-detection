@@ -7,7 +7,7 @@ import threading
 import cv2
 from flask import Flask, request, jsonify
 
-from model import DetectionModel, TextDetectionModel, TextRecognitionModel
+from model import ShipDetectionModel, TextDetectionModel, TextRecognitionModel
 
 
 http_host = '127.0.0.1'
@@ -15,7 +15,7 @@ http_port = 5000
 rtsp_host = '127.0.0.1'
 rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
-ship_det_model = DetectionModel('./yolov5m6.pt')
+ship_det_model = ShipDetectionModel('./yolov5m6.pt')
 text_det_model = TextDetectionModel('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
 text_rec_model = TextRecognitionModel('./TPS-ResNet-BiLSTM-Attn.pth')
 
