@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import threading
+from typing import Tuple
 
 import cv2
 from flask import Flask, request, jsonify
