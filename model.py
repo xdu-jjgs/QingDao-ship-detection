@@ -250,10 +250,11 @@ class TextRecognitionModel:
         self.model.eval()
 
     def __call__(self, frames: List[np.ndarray]) -> List[str]:
-        imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
+        imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
         texts = []
         for img in imgs:
-            img_processed = letterbox(img, (32, 100))[0]
+            img_processed = letterbox(img, (32, 100), auto=False, scaleFill=True)[0]
+            img_processed = np.expand_dims(img_processed, axis=2)
             img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
             img_processed = img_processed.unsqueeze(0) / 255.
             img_processed = img_processed[:,0:1,:,:]
