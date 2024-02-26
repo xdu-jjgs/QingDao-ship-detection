@@ -225,7 +225,7 @@ class ShipTracker:
     def reset(self):
         self.model = ByteTrack(conf_thresh=0.2, track_buffer=10, kalman_format='default')
 
-    def __call__(self, bboxes: List[ShipBoundingBox], frame: np.ndarray) -> List[int]:
+    def __call__(self, bboxes: List[ShipBoundingBox], frame: np.ndarray) -> List[ShipTrackingBox]:
         bboxes = np.array([[bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls] for bbox in bboxes])
         trks = self.model.update(bboxes, frame)[0]
         tboxes = []
