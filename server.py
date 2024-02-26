@@ -7,7 +7,12 @@ import threading
 import cv2
 from flask import Flask, request, jsonify
 
-from model import ShipDetector, TextDetector, TextRecognizer
+from model import ShipDetector, ShipTracker, TextDetector, TextRecognizer
+
+
+def trk_id2color(id: int) -> Tuple[int, int, int]:
+    id *= 3
+    return (37 * id) % 255, (17 * id) % 255, (29 * id) % 255
 
 
 http_host = '127.0.0.1'
@@ -16,6 +21,7 @@ rtsp_host = '127.0.0.1'
 rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
 ship_detector = ShipDetector('./yolov5m6.pt')
+ship_tracker = ShipTracker()
 text_detector = TextDetector('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
 text_recognizer = TextRecognizer('./TPS-ResNet-BiLSTM-Attn.pth')
 
@@ -51,6 +57,7 @@ def fetchAnnotatedStream():
         ]
         pipe = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
+        ship_tracker.reset()
         while rtsp_url2running[src_rtsp_url]:
             ret, frame = cap.read()
             if not ret:
@@ -58,6 +65,7 @@ def fetchAnnotatedStream():
                 break
 
             ship_bboxes = ship_detector(frame)
+            ship_tboxes = ship_tracker(ship_bboxes, frame)
             text_bboxes = text_detector(frame)
             text_frames = []
             for bbox in text_bboxes:
@@ -66,7 +74,10 @@ def fetchAnnotatedStream():
 
             for bbox in ship_bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
-                cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
+                cv2.putText(frame, f'{bbox.lbl}: {bbox:prob}', (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
+            for tbox in ship_tboxes:
+                cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 5)
+                cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 2), 0, 1, (255, 255, 255))
             for bbox, text in zip(text_bboxes, texts):
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 255), 5)
                 cv2.putText(frame, text, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)

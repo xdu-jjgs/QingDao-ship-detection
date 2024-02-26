@@ -5,6 +5,7 @@ from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import VGG_FeatureExtractor, RCNN_FeatureExtractor, ResNet_FeatureExtractor
 from modules.sequence_modeling import BidirectionalLSTM
 from modules.prediction import Attention
+from tracker.bytetrack import ByteTrack
 
 
 class TPSModel(nn.Module):
@@ -202,6 +203,39 @@ class ShipDetector:
                 bbox = ShipBoundingBox(x0, y0, x1 - x0, y1 - y0, score, cls)
                 bboxes.append(bbox)
         return bboxes
+
+
+class ShipTrackingBox:
+    def __init__(self, x: int, y: int, w: int, h: int, id: int, speed: int):
+        self.x0 = x
+        self.y0 = y
+        self.w = w
+        self.h = h
+        self.x1 = x + w
+        self.y1 = y + h
+        self.id = id
+        self.speed = speed
+
+
+# 船舶跟踪模型
+class ShipTracker:
+    def __init__(self):
+        self.reset()
+
+    def reset():
+        self.model = ByteTrack(conf_thresh=0.2, track_buffer=10, kalman_format='default')
+
+    def __call__(self, bboxes: List[ShipBoundingBox], frame: np.ndarray) -> List[int]:
+        bboxes = np.array([bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls] for bbox in bboxes)
+        trks = track.update(bboxes, frame)[0]
+        tboxes = []
+        for trk in trks:
+            x0, y0, x1, y1 = int(trk.tlbr[0]), int(trk.tlbr[1]), int(trk.tlbr[2]), int(trk.tlbr[3])
+            id = trk.track_id
+            speed = self.model.get_speed[trk.track_id]
+            tbox = ShipTrackingBox(x0, y0, x1 - x0, y1 - y0, id, speed)
+            tboxes.append(tbox)
+        return tboxes
 
 
 class TextBoundingBox:
