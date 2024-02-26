@@ -222,7 +222,7 @@ class ShipTracker:
     def __init__(self):
         self.reset()
 
-    def reset():
+    def reset(self):
         self.model = ByteTrack(conf_thresh=0.2, track_buffer=10, kalman_format='default')
 
     def __call__(self, bboxes: List[ShipBoundingBox], frame: np.ndarray) -> List[int]:
