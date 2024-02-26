@@ -226,8 +226,8 @@ class ShipTracker:
         self.model = ByteTrack(conf_thresh=0.2, track_buffer=10, kalman_format='default')
 
     def __call__(self, bboxes: List[ShipBoundingBox], frame: np.ndarray) -> List[int]:
-        bboxes = np.array([bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls] for bbox in bboxes)
-        trks = track.update(bboxes, frame)[0]
+        bboxes = np.array([[bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls] for bbox in bboxes])
+        trks = self.model.update(bboxes, frame)[0]
         tboxes = []
         for trk in trks:
             x0, y0, x1, y1 = int(trk.tlbr[0]), int(trk.tlbr[1]), int(trk.tlbr[2]), int(trk.tlbr[3])
@@ -266,7 +266,7 @@ class TextDetector:
             x1 = np.int32(np.max(polygon[:, 0]))
             y0 = np.int32(np.min(polygon[:, 1]))
             y1 = np.int32(np.max(polygon[:, 1]))
-            bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0, 1, 0)
+            bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0)
             bboxes.append(bbox)
         return bboxes
 
