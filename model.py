@@ -172,7 +172,7 @@ class ShipBoundingBox:
 
 
 # 船舶检测模型
-class ShipDetectionModel:
+class ShipDetector:
     def __init__(self, weight: str):
         self.device = select_device('')
         self.model = attempt_load(weight, device=self.device)
@@ -215,7 +215,7 @@ class TextBoundingBox:
 
 
 # 文本检测模型
-class TextDetectionModel:
+class TextDetector:
     def __init__(self, weight: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MMOCRInferencer(det='TextSnake', det_weights=weight, device=self.device)
@@ -238,7 +238,7 @@ class TextDetectionModel:
 
 
 # 文本识别模型
-class TextRecognitionModel:
+class TextRecognizer:
     def __init__(self, weight: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.converter = AttnLabelConverter('0123456789abcdefghijklmnopqrstuvwxyz')

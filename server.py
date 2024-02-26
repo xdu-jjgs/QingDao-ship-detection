@@ -7,7 +7,7 @@ import threading
 import cv2
 from flask import Flask, request, jsonify
 
-from model import ShipDetectionModel, TextDetectionModel, TextRecognitionModel
+from model import ShipDetector, TextDetector, TextRecognizer
 
 
 http_host = '127.0.0.1'
@@ -15,9 +15,9 @@ http_port = 5000
 rtsp_host = '127.0.0.1'
 rtsp_port = 8554
 app = Flask(__name__, static_folder='static', static_url_path='/')
-ship_det_model = ShipDetectionModel('./yolov5m6.pt')
-text_det_model = TextDetectionModel('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
-text_rec_model = TextRecognitionModel('./TPS-ResNet-BiLSTM-Attn.pth')
+ship_detector = ShipDetector('./yolov5m6.pt')
+text_detector = TextDetector('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
+text_recognizer = TextRecognizer('./TPS-ResNet-BiLSTM-Attn.pth')
 
 
 rtsp_url2running = defaultdict(lambda: False)
@@ -57,12 +57,12 @@ def fetchAnnotatedStream():
                 rtsp_url2running[src_rtsp_url] = False
                 break
 
-            ship_bboxes = ship_det_model(frame)
-            text_bboxes = text_det_model(frame)
+            ship_bboxes = ship_detector(frame)
+            text_bboxes = text_detector(frame)
             text_frames = []
             for bbox in text_bboxes:
                 text_frames.append(frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1])
-            texts = text_rec_model(text_frames)
+            texts = text_recognizer(text_frames)
 
             for bbox in ship_bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
@@ -147,7 +147,7 @@ def fetchAnnotatedMp4():
             ret, frame = cap.read()
             if not ret: break
 
-            bboxes = ship_det_model(frame)
+            bboxes = ship_detector(frame)
             for bbox in bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
                 cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
