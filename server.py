@@ -66,7 +66,7 @@ def fetchAnnotatedStream():
                 break
 
             ship_bboxes = ship_detector(frame)
-            ship_tboxes = ship_tracker(ship_bboxes, frame)
+            ship_tboxes = ship_tracker(frame, ship_bboxes)
             text_bboxes = text_detector([frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1] for bbox in ship_bboxes])
             texts = text_recognizer([frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1] for bbox in text_bboxes])
 
