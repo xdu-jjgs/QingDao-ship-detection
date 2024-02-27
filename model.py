@@ -254,20 +254,19 @@ class TextDetector:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MMOCRInferencer(det='TextSnake', det_weights=weight, device=self.device)
 
-    def __call__(self, frame: np.ndarray) -> List[TextBoundingBox]:
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        pred = self.model.textdet_inferencer(img)['predictions'][0]
-
+    def __call__(self, frames: List[np.ndarray]) -> List[TextBoundingBox]:
+        imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
         bboxes = []
-        for polygon in pred['polygons']:
-            polygon = np.array(polygon).reshape((-1, 2))
-            x0 = np.int32(np.min(polygon[:, 0]))
-            x1 = np.int32(np.max(polygon[:, 0]))
-            y0 = np.int32(np.min(polygon[:, 1]))
-            y1 = np.int32(np.max(polygon[:, 1]))
-            bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0)
-            bboxes.append(bbox)
+        for img in imgs:
+            pred = self.model.textdet_inferencer(img)['predictions'][0]
+            for polygon in pred['polygons']:
+                polygon = np.array(polygon).reshape((-1, 2))
+                x0 = np.int32(np.min(polygon[:, 0]))
+                x1 = np.int32(np.max(polygon[:, 0]))
+                y0 = np.int32(np.min(polygon[:, 1]))
+                y1 = np.int32(np.max(polygon[:, 1]))
+                bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0)
+                bboxes.append(bbox)
         return bboxes
 
 
