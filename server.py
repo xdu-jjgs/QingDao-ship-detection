@@ -67,8 +67,8 @@ def fetchAnnotatedStream():
 
             ship_bboxes = ship_detector(frame)
             ship_tboxes = ship_tracker(frame, ship_bboxes)
-            text_bboxes = text_detector([frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1] for bbox in ship_bboxes])
-            texts = text_recognizer([frame[bbox.y0:bbox.y1, bbox.x0:bbox.x1] for bbox in text_bboxes])
+            text_bboxes = text_detector(frame, ship_bboxes)
+            texts = text_recognizer(frame, text_bboxes)
 
             for bbox in ship_bboxes:
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)

@@ -254,10 +254,10 @@ class TextDetector:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MMOCRInferencer(det='TextSnake', det_weights=weight, device=self.device)
 
-    def __call__(self, frames: List[np.ndarray]) -> List[TextBoundingBox]:
-        imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
+    def __call__(self, frame: np.ndarray, ship_bboxes: List[ShipBoundingBox]) -> List[TextBoundingBox]:
         bboxes = []
-        for img in imgs:
+        for ship_bbox in ship_bboxes:
+            img = cv2.cvtColor(frame[ship_bbox.y0:ship_bbox.y1, ship_bbox.x0:ship_bbox.x1], cv2.COLOR_BGR2RGB)
             pred = self.model.textdet_inferencer(img)['predictions'][0]
             for polygon in pred['polygons']:
                 polygon = np.array(polygon).reshape((-1, 2))
@@ -265,7 +265,7 @@ class TextDetector:
                 x1 = np.int32(np.max(polygon[:, 0]))
                 y0 = np.int32(np.min(polygon[:, 1]))
                 y1 = np.int32(np.max(polygon[:, 1]))
-                bbox = TextBoundingBox(x0, y0, x1 - x0, y1 - y0)
+                bbox = TextBoundingBox(x0 + ship_bbox.x0, y0 + ship_bbox.y0, x1 - x0, y1 - y0)
                 bboxes.append(bbox)
         return bboxes
 
@@ -293,10 +293,10 @@ class TextRecognizer:
         self.model.load_state_dict(torch.load(weight, map_location=self.device))
         self.model.eval()
 
-    def __call__(self, frames: List[np.ndarray]) -> List[str]:
-        imgs = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in frames]
+    def __call__(self, frame: np.ndarray, text_bboxes: List[TextBoundingBox]) -> List[str]:
         texts = []
-        for img in imgs:
+        for text_bbox in text_bboxes:
+            img = cv2.cvtColor(frame[text_bbox.y0:text_bbox.y1, text_bbox.x0:text_bbox.x1], cv2.COLOR_BGR2GRAY)
             img_processed = letterbox(img, (32, 100), auto=False, scaleFill=True)[0]
             img_processed = np.expand_dims(img_processed, axis=2)
             img_processed = torch.from_numpy(img_processed.transpose(2,0,1)).to(self.device)
