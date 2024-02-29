@@ -25,6 +25,7 @@ ship_detector = ShipDetector('./yolov5m6.pt')
 ship_tracker = ShipTracker()
 text_detector = TextDetector('./textsnake_resnet50-oclip_fpn-unet_1200e_ctw1500_20221101_134814-a216e5b2.pth')
 text_recognizer = TextRecognizer('./TPS-ResNet-BiLSTM-Attn.pth')
+speed_threshold = 5
 
 
 rtsp_url2running = defaultdict(lambda: False)
@@ -71,11 +72,15 @@ def fetchAnnotatedStream():
             texts = text_recognizer(frame, text_bboxes)
 
             for bbox in ship_bboxes:
-                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 3)
+                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 0), 3)
                 cv2.putText(frame, f'{bbox.lbl}: {bbox.prob:.2f}', (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
             for tbox in ship_tboxes:
-                cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
-                cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
+                if tbox.speed < speed_threshold:
+                    cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
+                    cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
+                else:
+                    cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), (0, 0, 255), 3)
+                    cv2.putText(frame, f'ship-{tbox.id} exceeded', (tbox.x0, tbox.y0 - 25), 0, 1, (0, 0, 255), 2)
             for bbox, text in zip(text_bboxes, texts):
                 cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 0), 3)
                 cv2.putText(frame, text, (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
