@@ -253,8 +253,12 @@ class TextDetector:
     def __init__(self, weight: str):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = MMOCRInferencer(det='TextSnake', det_weights=weight, device=self.device)
+        self.countdown = 5
 
     def __call__(self, frame: np.ndarray, ship_bboxes: List[ShipBoundingBox]) -> List[TextBoundingBox]:
+        self.countdown -= 1
+        if self.countdown > 0: return []
+        self.countdown = 5
         bboxes = []
         for ship_bbox in ship_bboxes:
             img = cv2.cvtColor(frame[ship_bbox.y0:ship_bbox.y1, ship_bbox.x0:ship_bbox.x1], cv2.COLOR_BGR2RGB)
