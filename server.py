@@ -7,6 +7,7 @@ from typing import Tuple
 
 import cv2
 from flask import Flask, request, jsonify
+import numpy as np
 
 from model import ShipDetector, ShipTracker, TextDetector, TextRecognizer
 
@@ -28,6 +29,31 @@ text_recognizer = TextRecognizer('./TPS-ResNet-BiLSTM-Attn.pth')
 speed_threshold = 5
 
 
+def infer(frame: np.ndarray) -> np.ndarray:
+    # 模型推理
+    ship_bboxes = ship_detector(frame)
+    ship_tboxes = ship_tracker(frame, ship_bboxes)
+    text_bboxes = text_detector(frame, ship_bboxes)
+    texts = text_recognizer(frame, text_bboxes)
+
+    # 结果渲染
+    for bbox in ship_bboxes:
+        cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 0), 3)
+        cv2.putText(frame, f'{bbox.lbl}: {bbox.prob:.2f}', (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
+    for tbox in ship_tboxes:
+        if tbox.speed < speed_threshold:
+            cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
+            cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
+        else:
+            cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), (0, 0, 255), 3)
+            cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}(exceeded)', (tbox.x0, tbox.y0 - 25), 0, 1, (0, 0, 255), 2)
+    for bbox, text in zip(text_bboxes, texts):
+        cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 0), 3)
+        cv2.putText(frame, text, (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
+
+    return frame
+
+
 rtsp_url2running = defaultdict(lambda: False)
 '''光电实时监控-开始推流 API'''
 @app.route('/api/ai/fetchAnnotatedStream', methods=['GET'])
@@ -36,7 +62,7 @@ def fetchAnnotatedStream():
     src_rtsp_url = d_req.get('rtsp_url')
     dst_rtsp_url = f'rtsp://{rtsp_host}:{rtsp_port}/output'
 
-    def infer(src_rtsp_url: str, dst_rtsp_url: str):
+    def task():
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_rtsp_url)
@@ -66,25 +92,7 @@ def fetchAnnotatedStream():
                 rtsp_url2running[src_rtsp_url] = False
                 break
 
-            ship_bboxes = ship_detector(frame)
-            ship_tboxes = ship_tracker(frame, ship_bboxes)
-            text_bboxes = text_detector(frame, ship_bboxes)
-            texts = text_recognizer(frame, text_bboxes)
-
-            for bbox in ship_bboxes:
-                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 0), 3)
-                cv2.putText(frame, f'{bbox.lbl}: {bbox.prob:.2f}', (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
-            for tbox in ship_tboxes:
-                if tbox.speed < speed_threshold:
-                    cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
-                    cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
-                else:
-                    cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), (0, 0, 255), 3)
-                    cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}(exceeded)', (tbox.x0, tbox.y0 - 25), 0, 1, (0, 0, 255), 2)
-            for bbox, text in zip(text_bboxes, texts):
-                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 0), 3)
-                cv2.putText(frame, text, (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
-
+            frame = infer(frame)
             pipe.stdin.write(frame.tobytes())
 
         cap.release()
@@ -97,7 +105,7 @@ def fetchAnnotatedStream():
     # 新线程调用
     if not rtsp_url2running[src_rtsp_url]:
         rtsp_url2running[src_rtsp_url] = True
-        rtsp_thread = threading.Thread(target=infer, args=(src_rtsp_url, dst_rtsp_url))
+        rtsp_thread = threading.Thread(target=task)
         rtsp_thread.start()
 
     d_rsp = {
@@ -131,7 +139,7 @@ def fetchAnnotatedMp4():
     dst_m3u8_name = 'output.m3u8'
     dst_m3u8_url = f'http://{http_host}:{http_port}/{dst_m3u8_name}'
 
-    def infer(src_mp4_path: str, dst_m3u8_name: str):
+    def task():
         logging.debug('模型推理中...')
 
         cap = cv2.VideoCapture(src_mp4_path)
@@ -161,11 +169,7 @@ def fetchAnnotatedMp4():
             ret, frame = cap.read()
             if not ret: break
 
-            bboxes = ship_detector(frame)
-            for bbox in bboxes:
-                cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 255), 5)
-                cv2.putText(frame, bbox.lbl, (bbox.x0, bbox.y0 - 2), 0, 1, (255, 255, 255), 3)
-
+            frame = infer(frame)
             pipe.stdin.write(frame.tobytes())
 
         cap.release()
@@ -176,7 +180,7 @@ def fetchAnnotatedMp4():
         return
 
     # 新线程调用
-    t = threading.Thread(target=infer, args=(src_mp4_path, dst_m3u8_name))
+    t = threading.Thread(target=task)
     t.start()
 
     d_rsp = {
