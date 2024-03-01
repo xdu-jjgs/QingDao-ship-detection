@@ -1,5 +1,6 @@
 from collections import defaultdict
 import logging
+import json
 import os
 import subprocess
 import threading
@@ -8,6 +9,7 @@ from typing import Tuple
 import cv2
 from flask import Flask, request, jsonify
 import numpy as np
+import requests
 
 from model import ShipDetector, ShipTracker, TextDetector, TextRecognizer
 
@@ -15,12 +17,14 @@ from model import ShipDetector, ShipTracker, TextDetector, TextRecognizer
 def trk_id2color(id: int) -> Tuple[int, int, int]:
     id *= 3
     return (37 * id) % 255, (17 * id) % 255, (29 * id) % 255
+trk_id2snapshoted = defaultdict(lambda: False)
 
 
 http_host = '127.0.0.1'
 http_port = 5000
 rtsp_host = '127.0.0.1'
 rtsp_port = 8554
+snapshot_url = 'http://127.0.0.1:3306/mysql'
 app = Flask(__name__, static_folder='static', static_url_path='/')
 ship_detector = ShipDetector('./yolov5m6.pt')
 ship_tracker = ShipTracker()
@@ -35,6 +39,30 @@ def infer(frame: np.ndarray) -> np.ndarray:
     ship_tboxes = ship_tracker(frame, ship_bboxes)
     text_bboxes = text_detector(frame, ship_bboxes)
     texts = text_recognizer(frame, text_bboxes)
+
+    # 结果记录
+    def snapshot():
+        for tbox in ship_tboxes:
+            if trk_id2snapshoted[tbox.id]: continue
+            trk_id2snapshoted[tbox.id] = True
+            snapshot_name = f'ship-{tbox.id}.png'
+            logging.info('快照创建成功')
+            cv2.imwrite(os.path.join('static', snapshot_name), frame[tbox.y0:tbox.y1, tbox.x0:tbox.x1])
+            rsp = requests.post(
+                snapshot_url,
+                data=json.dumps({
+                    'snapshot_url': f'http://{http_host}:{http_port}/{snapshot_name}',
+                    'id': tbox.id,
+                }),
+                headers = {
+                    'Content-Type': 'application/json',
+                })
+            if rsp.status_code == 200:
+                logging.info('快照传输成功')
+            else:
+                logging.info('快照传输失败')
+    snapshot_thread = threading.Thread(target=snapshot)
+    snapshot_thread.start()
 
     # 结果渲染
     for bbox in ship_bboxes:

@@ -12,7 +12,7 @@
   $ # frames2video.py
   $ pip install tqdm
   $ # HTTP 服务器
-  $ pip install flask
+  $ pip install flask requests
   $ # 深度学习算法
   $ pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 -f https://download.pytorch.org/whl/cu102/torch_stable.html
   $ pip install numpy opencv-python pillow
