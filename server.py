@@ -122,7 +122,7 @@ def fetchAnnotatedStream():
                 break
 
             rst = infer(frame)
-            pipe.stdin.write(frame.tobytes())
+            pipe.stdin.write(rst.tobytes())
 
         cap.release()
         pipe.stdin.close()
@@ -199,7 +199,7 @@ def fetchAnnotatedMp4():
             if not ret: break
 
             rst = infer(frame)
-            pipe.stdin.write(frame.tobytes())
+            pipe.stdin.write(rst.tobytes())
 
         cap.release()
         pipe.stdin.close()
