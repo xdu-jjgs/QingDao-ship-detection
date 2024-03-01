@@ -64,22 +64,23 @@ def infer(frame: np.ndarray) -> np.ndarray:
     snapshot_thread = threading.Thread(target=snapshot)
     snapshot_thread.start()
 
+    rst = frame.copy()
     # 结果渲染
     for bbox in ship_bboxes:
-        cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 0), 3)
-        cv2.putText(frame, f'{bbox.lbl}: {bbox.prob:.2f}', (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
+        cv2.rectangle(rst, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 255, 0), 3)
+        cv2.putText(rst, f'{bbox.lbl}: {bbox.prob:.2f}', (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
     for tbox in ship_tboxes:
         if tbox.speed < speed_threshold:
-            cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
-            cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
+            cv2.rectangle(rst, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), trk_id2color(tbox.id), 3)
+            cv2.putText(rst, f'ship-{tbox.id} speed={tbox.speed}', (tbox.x0, tbox.y0 - 25), 0, 1, (255, 255, 255), 2)
         else:
-            cv2.rectangle(frame, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), (0, 0, 255), 3)
-            cv2.putText(frame, f'ship-{tbox.id} speed={tbox.speed}(exceeded)', (tbox.x0, tbox.y0 - 25), 0, 1, (0, 0, 255), 2)
+            cv2.rectangle(rst, (tbox.x0, tbox.y0), (tbox.x1, tbox.y1), (0, 0, 255), 3)
+            cv2.putText(rst, f'ship-{tbox.id} speed={tbox.speed}(exceeded)', (tbox.x0, tbox.y0 - 25), 0, 1, (0, 0, 255), 2)
     for bbox, text in zip(text_bboxes, texts):
-        cv2.rectangle(frame, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 0), 3)
-        cv2.putText(frame, text, (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
+        cv2.rectangle(rst, (bbox.x0, bbox.y0), (bbox.x1, bbox.y1), (0, 0, 0), 3)
+        cv2.putText(rst, text, (bbox.x0, bbox.y0 - 5), 0, 1, (255, 255, 255), 2)
 
-    return frame
+    return rst
 
 
 rtsp_url2running = defaultdict(lambda: False)
@@ -120,7 +121,7 @@ def fetchAnnotatedStream():
                 rtsp_url2running[src_rtsp_url] = False
                 break
 
-            frame = infer(frame)
+            rst = infer(frame)
             pipe.stdin.write(frame.tobytes())
 
         cap.release()
@@ -197,7 +198,7 @@ def fetchAnnotatedMp4():
             ret, frame = cap.read()
             if not ret: break
 
-            frame = infer(frame)
+            rst = infer(frame)
             pipe.stdin.write(frame.tobytes())
 
         cap.release()
