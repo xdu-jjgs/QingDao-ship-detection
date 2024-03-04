@@ -84,7 +84,7 @@
 
 ## 三、测试：光电实时监控-开始推流 API
 
-1. 将 `input1.mp4` 模拟为光电设备视频流
+1. 将 `input1.mp4` 模拟为光电设备视频流（这一步依赖于 mediamtx 的启动）
     ```shell
     $ ffmpeg -re -stream_loop -1 -i static/input1.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input
     ```
