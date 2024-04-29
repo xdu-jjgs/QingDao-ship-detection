@@ -5,7 +5,7 @@ import torch
 from collections import defaultdict
 
 class ByteTrack(BaseTracker):
-    def __init__(self, conf_thresh=0.2, track_buffer=10, kalman_format='default',
+    def __init__(self, conf_thresh=0.6, track_buffer=10, kalman_format='default',
                  frame_rate=30, *args, **kwargs) -> None:
         super().__init__()
         self.low_conf_thresh = max(0.15, conf_thresh - 0.3)  # low threshold for second matching
@@ -34,7 +34,7 @@ class ByteTrack(BaseTracker):
         """step 1. filter results and init tracks"""
                
         # filter small area bboxs
-        if self.filter_small_area:  
+        if self.filter_small_area and det_results.ndim == 2:
             small_indicies = det_results[:, 2]*det_results[:, 3] > 50
             det_results = det_results[small_indicies]
 
@@ -56,7 +56,7 @@ class ByteTrack(BaseTracker):
 
         if det_low.shape[0] > 0:
             D_low = [STrack(cls, STrack.tlbr2tlwh(tlbr), score, kalman_format='default')
-                            for (cls, tlbr, score) in zip(det_high[:, -1], det_high[:, :4], det_high[:, 4])]
+                            for (cls, tlbr, score) in zip(det_low[:, -1], det_low[:, :4], det_low[:, 4])]
         else:
             D_low = []
 
@@ -77,9 +77,11 @@ class ByteTrack(BaseTracker):
 
         """Step 2. first match, match high conf det with tracks"""
         Dist_mat = matching.iou_distance(atracks=strack_pool, btracks=D_high)
-        
+        #if Dist_mat.size != 0:
+            #Dist_mat[matching.iou_penalty([x.tlbr for x in strack_pool], [x.tlbr for x in D_high])] = 1
+
         # match
-        matched_pair0, u_tracks0_idx, u_dets0_idx = matching.linear_assignment(Dist_mat, thresh=0.01)
+        matched_pair0, u_tracks0_idx, u_dets0_idx = matching.linear_assignment(Dist_mat, thresh=0.98)
         for itrack_match, idet_match in matched_pair0:
             track = strack_pool[itrack_match]
             det = D_high[idet_match]
@@ -98,7 +100,7 @@ class ByteTrack(BaseTracker):
         """Step 3. second match, match remain tracks and low conf dets"""
         # only IoU
         Dist_mat = matching.iou_distance(atracks=u_tracks0, btracks=D_low)
-        matched_pair1, u_tracks1_idx, u_dets1_idx = matching.linear_assignment(Dist_mat, thresh=0.1)
+        matched_pair1, u_tracks1_idx, u_dets1_idx = matching.linear_assignment(Dist_mat, thresh=0.95)
 
         for itrack_match, idet_match in matched_pair1:
             track = u_tracks0[itrack_match]
@@ -121,7 +123,7 @@ class ByteTrack(BaseTracker):
         
         # deal with unconfirmed tracks, match new track of last frame and new high conf det
         Dist_mat = matching.iou_distance(unconfirmed, u_dets0)
-        matched_pair2, u_tracks2_idx, u_dets2_idx = matching.linear_assignment(Dist_mat, thresh=0.01)
+        matched_pair2, u_tracks2_idx, u_dets2_idx = matching.linear_assignment(Dist_mat, thresh=0.99)
         for itrack_match, idet_match in matched_pair2:
             track = unconfirmed[itrack_match]
             det = u_dets0[idet_match]

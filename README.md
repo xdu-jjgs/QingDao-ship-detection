@@ -1,5 +1,11 @@
 # 青岛船舶检测
 
+# Update 2024/4/29
+
+- [x] 更新跟踪逻辑；
+- [x] 更新文字检测模型(YOLOv5); 文字识别模型(ppocr)；
+- [x] 重新训练船舶检测模型(YOLOv5)，添加了接驳判断逻辑
+
 ## 零、环境要求
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流
@@ -19,12 +25,9 @@
   $ # 船舶检测模型
   $ pip install yolov5 # https://github.com/ultralytics/yolov5
   $ pip install dill
-  $ # 船舶跟踪模型
-  $ # 文字检测模型
-  $ pip install mmcv==2.0.0 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.10/index.html
-  $ pip install mmdet==3.1.0
-  $ pip install mmocr==1.0.1
-  $ # 文字识别模型
+  $ # 文字检测、识别
+  $ python pip install paddlepaddle -i https://mirror.baidu.com/pypi/simple
+  $ pip install paddleocr>=2.0.1
   ```
 
 ## 一、导出标注视频
