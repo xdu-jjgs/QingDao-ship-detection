@@ -1,16 +1,40 @@
-import numpy as np  
+import numpy as np
+from utils import Shift2Center  
 from .basetrack import TrackState, STrack, BaseTracker
 import tracker.matching as matching
 import torch 
 from collections import defaultdict
 
 class ByteTrack(BaseTracker):
-    def __init__(self, conf_thresh=0.6, track_buffer=10, kalman_format='default',
-                 frame_rate=30, *args, **kwargs) -> None:
+    def __init__(self, conf_thresh, sensor_w, sensor_h, image_w, image_h,frame_rate,zoom ,tilt,track_buffer, kalman_format,
+                  *args, **kwargs) -> None:
         super().__init__()
         self.low_conf_thresh = max(0.15, conf_thresh - 0.3)  # low threshold for second matching
         self.filter_small_area = True  # filter area < 50 bboxs
         self.loc = defaultdict(list)
+        self.sensor_w = sensor_w  # 摄像机传感器宽度 (mm)
+        self.sensor_h = sensor_h  # 摄像机传感器高度 (mm)
+        self.image_w = image_w    # 图像宽度 (pixels)
+        self.image_h = image_h
+        self.zoom = zoom/100
+        self.tilt = tilt/100
+        self.frame_rate = frame_rate
+        self.max_frame_id = 65536 # prevent frame_id from keeping increasing
+        self.s2c = Shift2Center(img_size=[image_w,image_h])
+
+    def get_ratio_pixel_to_real(self):
+        """计算每像素对应的实际距离比例"""
+        h_angle = np.arctan(self.sensor_w / (2 * self.zoom))
+        v_angle = np.arctan(self.sensor_h / (2 * self.zoom))
+        tilt_rad = self.tilt * np.pi / 180  # 转换为弧度
+        
+        viewing_len = 104 / np.cos(tilt_rad + np.pi / 2 - v_angle)
+        real_width = viewing_len * np.tan(h_angle)
+        
+        return real_width / self.image_w
+
+
+
 
     def update(self, det_results, ori_img):
         """
@@ -25,7 +49,7 @@ class ByteTrack(BaseTracker):
         if isinstance(ori_img, torch.Tensor):
             ori_img = ori_img.numpy()
 
-        self.frame_id += 1
+        self.frame_id = (self.frame_id + 1) % self.max_frame_id
         activated_starcks = []      # for storing active tracks, for the current frame
         refind_stracks = []         # Lost Tracks whose detections are obtained in the current frame
         lost_stracks = []           # The tracks which are not obtained in the current frame but are not removed.(Lost for some time lesser than the threshold for removing)
@@ -144,6 +168,8 @@ class ByteTrack(BaseTracker):
 
         """ Step 5. remove long lost tracks"""
         for track in self.lost_stracks:
+            if self.frame_id < track.end_frame:
+                self.frame_id += self.max_frame_id
             if self.frame_id - track.end_frame > self.max_time_lost:
                 track.mark_removed()
                 removed_stracks.append(track)
@@ -155,29 +181,43 @@ class ByteTrack(BaseTracker):
         # self.lost_stracks = [t for t in self.lost_stracks if t.state == TrackState.Lost]  # type: list[STrack]
         self.lost_stracks = sub_stracks(self.lost_stracks, self.tracked_stracks)
         self.lost_stracks.extend(lost_stracks)
-        self.lost_stracks = sub_stracks(self.lost_stracks, self.removed_stracks)
-        self.removed_stracks.extend(removed_stracks)
+        self.lost_stracks = sub_stracks(self.lost_stracks, removed_stracks)
+        # self.removed_stracks.extend(removed_stracks)
         self.tracked_stracks, self.lost_stracks = remove_duplicate_stracks(self.tracked_stracks, self.lost_stracks)
+
+        # delete speed info of removed tracklet and update available id
+        for track in removed_stracks:
+            rm_id = track.track_id
+            if rm_id in self.loc:
+                self.loc.pop(rm_id)
+            STrack.available_id.append(rm_id)
 
         # save locate
         for track in self.tracked_stracks+self.lost_stracks:
             self.loc[track.track_id].append(track.tlwh[:2] + 0.5 * track.tlwh[2:])
 
-        # print
-        if self.debug_mode:
-            print('===========Frame {}=========='.format(self.frame_id))
-            print('Activated: {}'.format([track.track_id for track in activated_starcks]))
-            print('Refind: {}'.format([track.track_id for track in refind_stracks]))
-            print('Lost: {}'.format([track.track_id for track in lost_stracks]))
-            print('Removed: {}'.format([track.track_id for track in removed_stracks]))
-        return [track for track in self.tracked_stracks if track.is_activated], [track for track in self.lost_stracks], [track for track in self.removed_stracks]
+        return [track for track in self.tracked_stracks if track.is_activated], [track for track in self.lost_stracks], []
+
+
 
     @property
     def get_speed(self):
         speed = {}
+        time_interval = 1 / self.frame_rate  # Calculate time interval based on frame rate
+        ratio_pixel_to_real = self.get_ratio_pixel_to_real()
         for trk_id, loc in self.loc.items():
-            speed[trk_id] = int(np.linalg.norm(loc[-1]-loc[-2], 2)) if len(loc) >= 2 else 0
+            if len(loc) >= 25:  # Using last three positions instead of two
+                # 当前帧和一秒前的像素位置对比估算速度
+                pixel_distance = np.linalg.norm(np.array(loc[-1]) - np.array(loc[-25]))
+                real_distance = pixel_distance * ratio_pixel_to_real
+                real_speed = real_distance / (24 * time_interval)  # Dividing by the interval for three frames
+                speed[trk_id] = round(real_speed * 3.6 / 1.852, 0)
+            else:
+                speed[trk_id] = 0
+
         return speed
+
+
 
 def joint_stracks(tlista, tlistb):
     exists = {}

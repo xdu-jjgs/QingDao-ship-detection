@@ -1,0 +1,43 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "results": {
+    "ship_detections": [
+      {
+        "label": "Container_Ship",
+        "probability": "0.82",
+        "bounding_box": [1632, 372, 1920, 718],
+        "rectangle_color": [111, 51, 87]
+      },
+      {
+        "label": "Roll-on_Roll-off_Ship",
+        "probability": "0.64",
+        "bounding_box": [279, 414, 1569, 753],
+        "rectangle_color": [234, 204, 18]
+      }
+    ],
+    "tracking_results": [
+      {
+        "id": 1,
+        "speed": 0,
+        "bounding_box": [1632, 372, 1920, 718],
+        "speed_status": "normal",
+        "rectangle_color": [111, 51, 87]
+      },
+      {
+        "id": 2,
+        "speed": 0,
+        "bounding_box": [279, 414, 1569, 753],
+        "speed_status": "normal",
+        "rectangle_color": [222, 102, 174]
+      }
+    ],
+    "text_detections": [
+      {
+        "text": "HORNING PILOT",
+        "bounding_box": [403, 579, 479, 598]
+      }
+    ]
+  },
+  "timestamp": 1714447059721
+}

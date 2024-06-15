@@ -72,6 +72,8 @@ KALMAN_DICT = {
 General class to describe a trajectory
 """
 class STrack(BaseTrack):
+    available_id = list(range(512))
+
     def __init__(self, cls, tlwh, score, kalman_format='default', 
         feature=None, use_avg_of_feature=True, store_features_budget=100) -> None:
         """
@@ -222,7 +224,7 @@ class STrack(BaseTrack):
         """
         init a new track
         """
-        self.track_id = BaseTrack.next_id()
+        self.track_id = STrack.available_id.pop(0)
         # init kalman
         if self.kalman_format in ['default', 'strongsort']:
             measurement = self.tlwh2xyah(self._tlwh)

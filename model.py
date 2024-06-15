@@ -1,6 +1,6 @@
 # https://github.com/clovaai/deep-text-recognition-benchmark/blob/master/model.py
-import torch.nn as nn
 
+from utils import CameraPos, Shift2Center
 from tracker.bytetrack import ByteTrack
 from typing import List
 
@@ -11,12 +11,9 @@ from yolov5.models.experimental import attempt_load
 from yolov5.utils.general import non_max_suppression, scale_boxes
 from yolov5.utils.torch_utils import select_device
 from yolov5.utils.augmentations import letterbox
-from utils import nms
+# from utils import nms
 # ocr
 import infer.utility as utility
-from ppocr.postprocess import build_post_process
-from ppocr.utils.logging import get_logger
-from ppocr.utils.utility import get_image_file_list, check_and_read
 from infer.predict_rec import TextRecognizer
  
 import platform
@@ -38,6 +35,7 @@ cls2lbl = [
     'Roll-on_Roll-off_Ship',
     'Cruise_Ship',
     'Specialty_Ships',
+    'Ships text',
     # 接驳也当做新的一类
     'Jie_Bo'
 ]
@@ -104,7 +102,7 @@ class ShipDetector:
             y_min = int(min(JB_all[:, 1]))
             x_max = int(max(JB_all[:, 2]))
             y_max = int(max(JB_all[:, 3]))
-            jiebo_bboxes.append([x_min, y_min, x_max, y_max, 1.0, 12])
+            jiebo_bboxes.append([x_min, y_min, x_max, y_max, 1.0, 13])
         
         if len(jiebo_bboxes) > 0:
             predict_boxes = np.concatenate([predict_boxes, jiebo_bboxes], axis=0)
@@ -151,7 +149,7 @@ class ShipDetector:
 
 
 class ShipTrackingBox:
-    def __init__(self, x: int, y: int, w: int, h: int, id: int, speed: int):
+    def __init__(self, x: int, y: int, w: int, h: int, id: int, speed: int, cls):
         self.x0 = x
         self.y0 = y
         self.w = w
@@ -160,24 +158,47 @@ class ShipTrackingBox:
         self.y1 = y + h
         self.id = id
         self.speed = speed
+        self.cls = cls
 
 
 # 船舶跟踪模型
 class ShipTracker:
-    def __init__(self):
+    def __init__(self,camera_pos:CameraPos):
+        self.camera_pos = camera_pos
         self.reset()
+        self.s2c = Shift2Center(img_size=[1920,1080])
 
     def reset(self):
-        self.model = ByteTrack(conf_thresh=0.2, track_buffer=10, kalman_format='default')
+            self.camera_pos.update_event.wait()
+            tilt, zoom = self.camera_pos.get_camera_position()
+            self.model = ByteTrack(
+                conf_thresh=0.2,
+                sensor_w=5.2,
+                sensor_h=5.2,
+                image_w=1920,
+                image_h=1080,
+                frame_rate=25,
+                tilt = tilt,
+                zoom=zoom,
+                track_buffer=10,
+                kalman_format='default'
+            )
+            self.camera_pos.update_event.clear() 
 
     def __call__(self, frame: np.ndarray, bboxes: List[ShipBoundingBox]) -> List[ShipTrackingBox]:
 
         # bboxes = np.array([[bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls] for bbox in bboxes]).reshape((-1, 6))
         # 过滤掉接驳的框
         ship_bboxes = []
-        for bbox in bboxes:
-            if bbox.cls != 12:
-                ship_bboxes.append([bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls])
+        # 转动期间采用s2c的输出结果:
+        if 0 < self.s2c.flag_cnt < 30:
+            for bbox in self.s2c.shift_box:
+                if bbox.cls != 13:
+                    ship_bboxes.append([bbox.x0, bbox.y0, bbox.x1, bbox.y1, 0.9, bbox.cls])
+        else:
+            for bbox in bboxes:
+                if bbox.cls != 13:
+                    ship_bboxes.append([bbox.x0, bbox.y0, bbox.x1, bbox.y1, bbox.prob, bbox.cls])
         ship_bboxes = np.array(ship_bboxes).reshape((-1, 6))
 
         trks = self.model.update(ship_bboxes, frame)[0]
@@ -185,9 +206,12 @@ class ShipTracker:
         for trk in trks:
             x0, y0, x1, y1 = int(trk.tlbr[0]), int(trk.tlbr[1]), int(trk.tlbr[2]), int(trk.tlbr[3])
             id = trk.track_id
+            cls = trk.cls
             speed = self.model.get_speed[trk.track_id]
-            tbox = ShipTrackingBox(x0, y0, x1 - x0, y1 - y0, id, speed)
+            tbox = ShipTrackingBox(x0, y0, x1 - x0, y1 - y0, id, speed, cls)
             tboxes.append(tbox)
+
+        tboxes = self.s2c.shift_2_center(tboxes)
         return tboxes
 
 
