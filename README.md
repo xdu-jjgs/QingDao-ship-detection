@@ -93,7 +93,7 @@ const videoUrls = [
 2.启动 webrtc-streamer
 
 ```bash
-cd webrtc-streamer-v0.8.4-windows
+cd ./user_interface/webrtc-streamer-v0.8.4-windows
 ./webrtc-streamer -H 8443s -c ./cert/server-all.pem
 或直接 ./webrtc-streamer
 ```
@@ -101,7 +101,7 @@ cd webrtc-streamer-v0.8.4-windows
 3.启动前端程序，启动后访问 localhost:5174/
 
 ```bash
-cd playground
+cd ./user_interface/playground
 npm install
 npm run dev
 ```
