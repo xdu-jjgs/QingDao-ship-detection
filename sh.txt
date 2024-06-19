@@ -1,0 +1,19 @@
+# 将 input1.mp4 模拟为光电设备视频流
+ffmpeg -re -stream_loop -1 -i shift2center_demo.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i ../QingDao-ship-detection_me/video/20240422-接驳/接驳18.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i ../QingDao-ship-detection_me/speed_boat.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i ../QingDao-ship-detection_me/video/16楼-远景.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input2
+ffmpeg -re -stream_loop -1 -i ../QingDao-ship-detection_me/video/16楼航道近景-1.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input3
+
+http://127.0.0.1:5000/api/ai/fetchAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input1
+
+# 光电视频回放 API http://127.0.0.1:5000/output.m3u8
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/16楼-远景.mp4
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/20240422-接驳/接驳18.mp4
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/文字检测.mp4
+
+# 停止推流 API
+http://127.0.0.1:5000/api/ai/terminateAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input
+
+python server1.1.py
+python server-WebSockets-Process.py

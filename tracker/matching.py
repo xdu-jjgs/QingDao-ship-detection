@@ -27,18 +27,15 @@ def merge_matches(m1, m2, shape):
 
 
 def linear_assignment(cost_matrix, thresh):
-    '''a, b = linear_sum_assignment(np.array([[1, 2], [2, 2], [1, 0]]))
-    unmatched_a = list(set(range(3)) - set(list(a)))
-    unmatched_b = list(set(range(2)) - set(list(b)))'''
+
     if cost_matrix.size == 0:
         return np.empty((0, 2), dtype=int), tuple(range(cost_matrix.shape[0])), tuple(range(cost_matrix.shape[1]))
     matches, unmatched_a, unmatched_b = [], [], []
-    #print(cost_matrix)
     x, y = linear_sum_assignment(cost_matrix)
     delete_x = []
     delete_y = []
     for i in range(len(x)):
-        if cost_matrix[x[i], y[i]] < thresh:
+        if cost_matrix[x[i], y[i]] > thresh:
             delete_x.append(x[i])
             delete_y.append(y[i])
             continue
@@ -91,6 +88,19 @@ def ious(atlbrs, btlbrs):
             btlbrs[:, 3] - btlbrs[:, 1]))[np.newaxis, :].repeat(A, axis=0)
     return inter / (area_0 + area_1 - inter)
 
+def iou_penalty(atlbrs, btlbrs):
+    atlbrs = np.array(atlbrs)
+    btlbrs = np.array(btlbrs)
+    A = atlbrs.shape[0]
+    B = btlbrs.shape[0]
+    area_0 = ((atlbrs[:, 2] - atlbrs[:, 0]) * (
+            atlbrs[:, 3] - atlbrs[:, 1]))[:, np.newaxis].repeat(B, axis=1)
+    area_1 = ((btlbrs[:, 2] - btlbrs[:, 0]) * (
+            btlbrs[:, 3] - btlbrs[:, 1]))[np.newaxis, :].repeat(A, axis=0)
+    size_diff = np.max(np.array([area_0, area_1]),axis=0)/np.min(np.array([area_0, area_1]),axis=0)/2
+    return size_diff>3
+
+
 
 
 def iou_distance(atracks, btracks):
@@ -109,6 +119,7 @@ def iou_distance(atracks, btracks):
         atlbrs = [track.tlbr for track in atracks]
         btlbrs = [track.tlbr for track in btracks]
     _ious = ious(atlbrs, btlbrs)
+
     cost_matrix = 1 - _ious
 
     return cost_matrix
