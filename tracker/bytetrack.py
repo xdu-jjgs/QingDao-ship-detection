@@ -20,18 +20,8 @@ class ByteTrack(BaseTracker):
         self.tilt = tilt/100
         self.frame_rate = frame_rate
         self.max_frame_id = 65536 # prevent frame_id from keeping increasing
-        self.s2c = Shift2Center(img_size=[image_w,image_h])
+        self.s2c = Shift2Center(img_size=(image_w,image_h))
 
-    def get_ratio_pixel_to_real(self):
-        """计算每像素对应的实际距离比例"""
-        h_angle = np.arctan(self.sensor_w / (2 * self.zoom))
-        v_angle = np.arctan(self.sensor_h / (2 * self.zoom))
-        tilt_rad = self.tilt * np.pi / 180  # 转换为弧度
-        
-        viewing_len = 104 / np.cos(tilt_rad + np.pi / 2 - v_angle)
-        real_width = viewing_len * np.tan(h_angle)
-        
-        return real_width / self.image_w
 
 
 
@@ -200,6 +190,19 @@ class ByteTrack(BaseTracker):
 
 
 
+    def get_ratio_pixel_to_real(self):
+        """计算每像素对应的实际距离比例"""
+        h_angle = np.arctan(self.sensor_w / (2 * self.zoom))
+        v_angle = np.arctan(self.sensor_h / (2 * self.zoom))
+        tilt_rad = self.tilt * np.pi / 180  # 转换为弧度
+        
+        viewing_len = 104 / np.cos(tilt_rad + np.pi / 2 - v_angle)
+        real_width = viewing_len * np.tan(h_angle)
+        
+        return real_width / self.image_w
+
+
+
     @property
     def get_speed(self):
         speed = {}
@@ -211,7 +214,7 @@ class ByteTrack(BaseTracker):
                 pixel_distance = np.linalg.norm(np.array(loc[-1]) - np.array(loc[-25]))
                 real_distance = pixel_distance * ratio_pixel_to_real
                 real_speed = real_distance / (24 * time_interval)  # Dividing by the interval for three frames
-                speed[trk_id] = round(real_speed * 3.6 / 1.852, 0)
+                speed[trk_id] = round(real_speed * 3.6 / 1.852, 0) # 换算公里->海里
             else:
                 speed[trk_id] = 0
 

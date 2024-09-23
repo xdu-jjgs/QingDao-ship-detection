@@ -80,6 +80,7 @@ export const useWebsocketStore = defineStore("websocket", () => {
         userName: "admin",
         rtsp_url: [url],
         selections: {
+          video_id: "29",
           videoWidth: rect.canvasWidth,
           videoHeight: rect.canvasHeight,
           bbox: [

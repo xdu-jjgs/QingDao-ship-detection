@@ -2,8 +2,7 @@
 import Player from "./Player.vue";
 
 const videoUrls = [
-    'rtsp://127.0.0.1:8554/input1',
-    'rtsp://127.0.0.1:8554/input1',
+    'rtsp://127.0.0.1:8554/input',
 ];
 </script>
 

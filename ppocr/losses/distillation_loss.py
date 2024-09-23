@@ -1143,7 +1143,7 @@ class DistillCTCLogits(KLCTCLogits):
             loss = super().forward(out1, out2, ctc_label)
             if isinstance(loss, dict):
                 for key in loss:
-                    loss_dict["{}_{}_{}".format(self.name, model_name,
+                    loss_dict["{}_{}_{}".format(self.name, self.model_name_pairs,
                                                 idx)] = loss[key]
             else:
                 loss_dict["{}_{}".format(self.name, idx)] = loss

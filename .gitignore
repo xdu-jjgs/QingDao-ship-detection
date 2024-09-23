@@ -1,8 +1,9 @@
-__pycache__
-best_ship_det_6_13.pt
-best_text_det.pt 
+sh.txt
+__pycache__/
+ckpt/
 ffmpeg.exe
-mediamtx.exe 
-server.cer 
-server.key 
-shift2center_demo.mp4 
+mediamtx.exe
+shift2center.mp4
+debug.txt
+ffmpeg.exe
+mediamtx.exe
