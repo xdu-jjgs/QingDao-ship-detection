@@ -7,10 +7,15 @@ import numpy as np
 import requests
 
 from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, PaddleRecognizer
+# from model_with_log import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, PaddleRecognizer
+
 from utils import VideoCapture, CameraPos
 from constant import semaphore, data_url, inferred_data, trk_id2snapshoted, snapshot_url, http_host, http_port, ship_trackers, infer_worker_threads, websocket_connections
 
-def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoCapture):
+
+
+
+def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoCapture, url_id: int):
 
     ship_detector = None
     text_detector = None
@@ -20,10 +25,11 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
     if src_rtsp_url == 'rtsp://192.168.101.190:554/test_173':
         ship_detector = LWIRShipDetector('./ckpt/best_ship_det_infra_8_30.pt', src_rtsp_url)
     else:
-        ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url)
-
+        #ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url)
+        ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url, url_id)
     if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
-        text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt')
+        #text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt')
+        text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt', url_id)
         text_recognizer = PaddleRecognizer()
 
     ship_tracker = ShipTracker(camera_pos)
@@ -48,17 +54,32 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
         del infer_worker_threads[src_rtsp_url]
         logging.debug(f"{src_rtsp_url}模型推理结束...")
 
+
+
+
 # 推理并记录
 def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url:str, ship_detector:ShipDetector, ship_tracker:ShipTracker, text_detector:TextDetector, text_recognizer:PaddleRecognizer):
 
     height, width = frame.shape[:2]
-
     ship_bboxes = ship_detector(frame)
-
     ship_tboxes = ship_tracker(frame, ship_bboxes)
 
     # 将文字识别部分跳帧
     text_bboxes = text_detector(frame) if text_detector is not None else []
+
+    #todo for 筛选船牌
+    new_text_bboxes=[]#创建一个空列表
+    for j in range(len(text_bboxes)):#遍历所有船牌
+        count=0
+        for i in range(len(ship_bboxes)):#船牌j遍历所有船体，看船牌j是否在这一帧中的某个船体内
+            if(ship_bboxes[i].x0 <=text_bboxes[j].x0 and ship_bboxes[i].x1>=text_bboxes[j].x1 
+               and ship_bboxes[i].y0<=text_bboxes[j].y0 and ship_bboxes[i].y1>=text_bboxes[j].y1):#判断船牌是否在船体内
+                count=count+1
+        if count>0:#count>0表示船牌j至少在某个船体内
+            new_text_bboxes.append(text_bboxes[j])#保存在船体内的船牌
+    
+    text_bboxes = new_text_bboxes#将筛选后的船牌框列表重新赋值给text_bboxes 
+
 
     ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []
 

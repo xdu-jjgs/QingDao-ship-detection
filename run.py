@@ -13,7 +13,7 @@ from constant import http_host, http_port, infer_worker_threads, mediamtx_server
 
 # 检查 url 并根据 url 动态创建和关闭线程
 def monitor_urls(urls):
-    for url in urls:  
+    for url_id, url in enumerate(urls):  
         if url not in infer_worker_threads:
             infer_worker_threads[url] = True
             # todo 根据rtsp_url拆分出要查询那个摄像头的参数-需要cms先设计好光电设备管理的功能
@@ -24,7 +24,7 @@ def monitor_urls(urls):
             camera_pos = CameraPos('29')
             # video capture 实例化
             video_capture = VideoCapture(url)
-            task_thread = threading.Thread(target=inferOneVideo, args=(url, camera_pos, video_capture), name='Infer')
+            task_thread = threading.Thread(target=inferOneVideo, args=(url, camera_pos, video_capture, url_id), name='Infer')
             task_thread.daemon = True
             task_thread.start()
 

@@ -101,8 +101,10 @@ class LWIRShipDetector:
 
 # 船舶检测模型
 class ShipDetector:
-    def __init__(self, weight: str, src_rtsp_url: str):
-        self.device = select_device('')
+    def __init__(self, weight: str, src_rtsp_url: str, device_id=0):
+        # 不知道为啥select_device无论是0还是1结果都是0，所以不要这个函数。干脆手动设置
+        # self.device = select_device(str(device_id))
+        self.device = f'cuda:{device_id}'
         self.model = attempt_load(weight, device=self.device)
         self.imgsz = 1280
         self.score_thres = 0.25
@@ -268,8 +270,10 @@ class TextBoundingBox:
 
 # 文本检测模型
 class TextDetector:
-    def __init__(self, weight: str):
-        self.device = select_device('')
+    def __init__(self, weight: str, device_id=0):
+        # 不知道为啥select_device无论是0还是1结果都是0，所以不要这个函数。干脆手动设置
+        # self.device = select_device(str(device_id))
+        self.device = f'cuda:{device_id}'
         self.model = attempt_load(weight, device=self.device)
         self.imgsz = 1280
         self.score_thres = 0.25

@@ -24,6 +24,11 @@
 
 - 重构了项目
 
+`2024/10/22`:
+
+- 添加了多流多卡逻辑
+- 添加了舍弃船排框不在船体中的逻辑
+
 ## 推理环境准备
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流
@@ -94,10 +99,10 @@ ffmpeg -re -stream_loop -1 -i [path_to_video_file] -c copy -f rtsp rtsp://127.0.
 
 3.修改server端rtsp流为ffmpeg推流地址：
 
-例：`main.py`:
+例：`urls.json`:
 
 ```
-    src_rtsp_urls = [
+    [
         'rtsp://127.0.0.1:8554/input1',
     ]
 ```

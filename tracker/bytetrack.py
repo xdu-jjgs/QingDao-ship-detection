@@ -12,12 +12,14 @@ class ByteTrack(BaseTracker):
         self.low_conf_thresh = max(0.15, conf_thresh - 0.3)  # low threshold for second matching
         self.filter_small_area = True  # filter area < 50 bboxs
         self.loc = defaultdict(list)
+        self.camera_height = 45   # 摄像头距离拍摄对象水平面的垂直高度 (m)
         self.sensor_w = sensor_w  # 摄像机传感器宽度 (mm)
         self.sensor_h = sensor_h  # 摄像机传感器高度 (mm)
         self.image_w = image_w    # 图像宽度 (pixels)
         self.image_h = image_h
-        self.zoom = zoom/100
-        self.tilt = tilt/100
+        self.zoom = zoom/100      # 摄像头焦距 (mm)
+        self.tilt = np.deg2rad(tilt/100)    # 摄像头俯仰角(转换为弧度)
+        self.phi = 2 * np.arctan(sensor_h / (2*zoom))  # 摄像头垂直视场角
         self.frame_rate = frame_rate
         self.max_frame_id = 65536 # prevent frame_id from keeping increasing
         self.s2c = Shift2Center(img_size=(image_w,image_h))
@@ -194,12 +196,21 @@ class ByteTrack(BaseTracker):
         """计算每像素对应的实际距离比例"""
         h_angle = np.arctan(self.sensor_w / (2 * self.zoom))
         v_angle = np.arctan(self.sensor_h / (2 * self.zoom))
-        tilt_rad = self.tilt * np.pi / 180  # 转换为弧度
         
-        viewing_len = 104 / np.cos(tilt_rad + np.pi / 2 - v_angle)
+        viewing_len = 104 / np.cos(self.tilt + np.pi / 2 - v_angle)
         real_width = viewing_len * np.tan(h_angle)
         
         return real_width / self.image_w
+
+
+
+    def get_scale(self, loc):
+        '''估算当前坐标相比于画面中心点的相对速度比例因子'''
+        loc = np.array(loc)
+        # 任意坐标相比于画面中心点的相对速度:
+        scale = np.tan(self.tilt) / np.tan(self.tilt + ((loc[1] - self.image_h/2) / self.image_h) * self.phi)
+        return scale
+
 
 
 
@@ -208,12 +219,15 @@ class ByteTrack(BaseTracker):
         speed = {}
         time_interval = 1 / self.frame_rate  # Calculate time interval based on frame rate
         ratio_pixel_to_real = self.get_ratio_pixel_to_real()
+
         for trk_id, loc in self.loc.items():
             if len(loc) >= 25:  # Using last three positions instead of two
                 # 当前帧和一秒前的像素位置对比估算速度
                 pixel_distance = np.linalg.norm(np.array(loc[-1]) - np.array(loc[-25]))
-                real_distance = pixel_distance * ratio_pixel_to_real
-                real_speed = real_distance / (24 * time_interval)  # Dividing by the interval for three frames
+                real_distance = pixel_distance * ratio_pixel_to_real 
+                # 获得相比于画面中心点的相对速度
+                scale = self.get_scale(loc[-1])
+                real_speed = real_distance / (24 * time_interval) * scale # Dividing by the interval for three frames
                 speed[trk_id] = round(real_speed * 3.6 / 1.852, 0) # 换算公里->海里
             else:
                 speed[trk_id] = 0
