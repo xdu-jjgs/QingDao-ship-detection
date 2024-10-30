@@ -29,6 +29,11 @@
 - 添加了多流多卡逻辑
 - 添加了舍弃船排框不在船体中的逻辑
 
+`2024/10/30`:
+
+- 更新多流多卡逻辑，按gpu个数分配
+- 更新了paddle ocr，舍弃paddle库，改用onnxruntime推理船牌OCR部分
+
 ## 推理环境准备
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流
@@ -39,18 +44,12 @@
 - 配置 Python 环境：
 
 ```
-conda create -n QD_ship_det python=3.9
+conda create -n QD_ship_det python=3.10
 pip install -r requirements.txt
 conda activate QD_ship_det
 ```
 
-- 配置pytorch环境(cuda版本大于等于11.7)：
-
-```
-conda install pytorch==1.13.0 torchvision==0.14.0 pytorch-cuda=11.7 -c pytorch -c nvidia
-```
-
-**其他依赖**
+**依赖说明**
 
 ```bash
 # HTTP 服务器
@@ -59,17 +58,8 @@ pip install flask requests websockets
 pip install numpy opencv-python pillow
 # 船舶检测模型
 pip install yolov5
-pip install dill
 # 文字检测、识别
 pip install tqdm
-# 用 cpu 版本的 paddle 就可以了(必须是2.5.2，不然有bug，无法长时间运行)
-# 但是 2.5.2 版本的推理速度很慢
-# https://github.com/PaddlePaddle/PaddleOCR/issues/11530
-# https://www.paddlepaddle.org.cn/install/old
-conda install paddlepaddle==3.0.0b1 -c paddle
-# gpu版本的 paddle(它没用cuda编译过，需要在宿主机安装cudnn且导出为环境变量)
-# pip install paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu117/
-pip install paddleocr>=2.8.1
 ```
 
 ## 启动项目
@@ -147,7 +137,7 @@ npm run dev
 
 ```
 .\mediamtx.exe
-ffmpeg -re -stream_loop -1 -i shift2center.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input
+ffmpeg -re -stream_loop -1 -i shift2center.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input
 cd .\user_interface\webrtc-streamer-v0.8.5-dirty-Windows-AMD64-Release\
 .\webrtc-streamer.exe
 cd .\user_interface\playground\  

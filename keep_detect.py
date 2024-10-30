@@ -30,8 +30,7 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
     if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
         #text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt')
         text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt', url_id)
-        text_recognizer = PaddleRecognizer()
-
+        text_recognizer = PaddleRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt')
     ship_tracker = ShipTracker(camera_pos)
     ship_tracker.reset()
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id

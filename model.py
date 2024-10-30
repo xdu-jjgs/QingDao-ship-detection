@@ -5,14 +5,16 @@ from typing import List
 import numpy as np
 import cv2
 import torch
-import infer.utility as utility
 import platform
+import onnxruntime
+import cv2
+import numpy as np
+import math
 
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.general import non_max_suppression, scale_boxes
 from yolov5.utils.torch_utils import select_device
 from yolov5.utils.augmentations import letterbox
-from infer.predict_rec import TextRecognizer
 from utils import CameraPos, Shift2Center
 from tracker.bytetrack import ByteTrack
 from constant import cls2lbl
@@ -328,20 +330,127 @@ class TextDetector:
         return bboxes
 
 
-# 文本识别模型
+
+
+
+
+
+
+
+
+
 class PaddleRecognizer:
-    def __init__(self, args=utility.parse_args()):
-        # 如果直接用 paddleocr 推理速度会慢，所以用了源代码
-        self.args = args
-        self.recognizer = TextRecognizer(args)
+    def __init__(self, onnx_weight_path:str, character_dict_path=None, device_id:int=0, use_space_char=True):
+        '''
+        Args:
+            - onnx_weight_path:    onnx模型权重路径
+            - character_dict_path: 字典的路径(文字的字典)
+            - device_id:           使用的cuda编号
+            - use_space_char:      True
+
+        '''
+
+        self.session_rec = onnxruntime.InferenceSession(onnx_weight_path)
+
+        # 检查 CUDA 是否可用
+        if 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
+            self.session_rec.set_providers(['CUDAExecutionProvider'], [{'device_id': device_id}])
+            print("Using GPU for inference.")
+        else:
+            self.session_rec.set_providers(['CPUExecutionProvider'])
+            print("CUDA is not available. Using CPU for inference.")
+            
+        self.character_str = []
+        with open(character_dict_path, "rb") as fin:
+            lines = fin.readlines()
+            for line in lines:
+                line = line.decode('utf-8').strip("\n").strip("\r\n")
+                self.character_str.append(line)
+        self.character_str.append(" ")
+        dict_character = list(self.character_str)
+        dict_character = self.add_special_char(dict_character)
+        self.dict = {}
+        for i, char in enumerate(dict_character):
+            self.dict[char] = i
+        self.character = dict_character
+
+
+
 
     def __call__(self, frame: np.ndarray, text_bboxes: List[TextBoundingBox]) -> List[str]:
+        '''获取识别结果
+        '''
         texts = []
-        image_list = []
         for text_bbox in text_bboxes:
             img = frame[text_bbox.y0:text_bbox.y1, text_bbox.x0:text_bbox.x1]
-            image_list.append(img)
-        results, _ = self.recognizer(image_list)
-        for result in results:
-            texts.append(result[0])    
+            norm_img = self.resize_norm_img(img)
+            norm_img = norm_img.reshape(1, *norm_img.shape)
+            y_onnx = self.session_rec.run([self.session_rec.get_outputs()[0].name], {self.session_rec.get_inputs()[0].name: norm_img})[0]
+            rec_result = self.vec2text(y_onnx)
+            texts.append(rec_result[0][0]) 
+            # print(rec_result[0][0])
         return texts
+
+
+    def vec2text(self, preds):
+        '''用于将结果向量转化为文字结果
+        '''
+        preds_idx = preds.argmax(axis=2)
+        # preds_prob = preds.max(axis=2)
+        # print(preds_idx.shape, preds_prob.shape)
+        text = self.decode(preds_idx)
+        return text
+    
+
+
+    def decode(self, text_index):
+        result_list = []
+        ignored_tokens = [0]
+        batch_size = len(text_index)
+        for batch_idx in range(batch_size):
+            selection = np.ones(len(text_index[batch_idx]), dtype=bool)
+            selection[1:] = text_index[batch_idx][1:] != text_index[batch_idx][:-1]
+            for ignored_token in ignored_tokens:
+                selection &= text_index[batch_idx] != ignored_token
+            char_list = [
+                self.character[text_id]
+                for text_id in text_index[batch_idx][selection]
+            ]
+            conf_list = [1] * len(selection)
+            if len(conf_list) == 0:
+                conf_list = [0]
+            text = ''.join(char_list)
+            result_list.append((text, np.mean(conf_list).tolist()))
+            return result_list
+
+
+    def add_special_char(self, dict_character):
+        dict_character = ['blank'] + dict_character
+        return dict_character
+
+
+    # 图像处理
+    @staticmethod
+    def resize_norm_img(img):
+        rec_image_shape = (3, 48, 320)
+        imgC, imgH, imgW = rec_image_shape[:3]
+        assert imgC == img.shape[2]
+        max_wh_ratio = imgW / imgH
+        h, w = img.shape[0:2]
+        wh_ratio = w * 1.0 / h
+        max_wh_ratio = max(max_wh_ratio, wh_ratio)
+        imgW = int((imgH * max_wh_ratio))
+        ratio = w / float(h)
+        if math.ceil(imgH * ratio) > imgW:
+            resized_w = imgW
+        else:
+            resized_w = int(math.ceil(imgH * ratio))
+        resized_image = cv2.resize(img, (resized_w, imgH))
+        resized_image = resized_image.astype('float32')
+        resized_image = resized_image.transpose((2, 0, 1)) / 255
+        resized_image -= 0.5
+        resized_image /= 0.5
+        padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
+        padding_im[:, :, 0:resized_w] = resized_image
+        return padding_im
+
