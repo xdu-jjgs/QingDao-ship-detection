@@ -1,9 +1,8 @@
 sh.txt
 __pycache__/
 ckpt/
-ffmpeg.exe
-mediamtx.exe
-shift2center.mp4
-debug.txt
+videos/
+nodejs/
+infer_time/
 ffmpeg.exe
 mediamtx.exe

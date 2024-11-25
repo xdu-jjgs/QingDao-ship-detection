@@ -86,7 +86,7 @@ def ious(atlbrs, btlbrs):
             atlbrs[:, 3] - atlbrs[:, 1]))[:, np.newaxis].repeat(B, axis=1)
     area_1 = ((btlbrs[:, 2] - btlbrs[:, 0]) * (
             btlbrs[:, 3] - btlbrs[:, 1]))[np.newaxis, :].repeat(A, axis=0)
-    return inter / (area_0 + area_1 - inter)
+    return inter / (area_0 + area_1 - inter + 1e-7)
 
 def iou_penalty(atlbrs, btlbrs):
     atlbrs = np.array(atlbrs)

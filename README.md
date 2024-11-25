@@ -38,7 +38,10 @@
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流
 - 安装 [mediamtx](https://github.com/bluenviron/mediamtx/releases),  [ffmpeg](https://ffmpeg.org/)
-- 安装`node.js`：[Node.js安装与配置（详细步骤）_nodejs安装及环境配置-CSDN博客](https://blog.csdn.net/qq_42006801/article/details/124830995)
+- 安装`node.js`：
+  - win系统：[Node.js安装与配置（详细步骤）_nodejs安装及环境配置-CSDN博客](https://blog.csdn.net/qq_42006801/article/details/124830995)
+  - linux系统：[Linux系统安装Nodejs（详细教程）_linux安装nodejs-CSDN博客](https://blog.csdn.net/qq_45830276/article/details/126022778)
+
 - 性能较强的一到多个 Nvidia GPU，主要用于目标检测模型推理
 - 安装 [CUDA](https://developer.nvidia.com/cuda-downloads)
 - 配置 Python 环境：
@@ -49,7 +52,13 @@ pip install -r requirements.txt
 conda activate QD_ship_det
 ```
 
-**依赖说明**
+配置pytorch环境(cuda版本大于等于11.7)：
+
+```
+conda install pytorch==1.13.0 torchvision==0.14.0 pytorch-cuda=11.7 -c pytorch -c nvidia
+```
+
+**其他依赖**
 
 ```bash
 # HTTP 服务器
@@ -185,3 +194,46 @@ python setup.py build_ext --inplace
 ```
 
 4.编译文件(`.so` 或`.pyd`)会生成在`arrange_tgt_dir`路径下，将源项目其余文件迁移到该路径下即可
+
+
+
+## Linux系统下可能出现的报错解决方法
+
+**1.[ModuleNotFoundError](https://so.csdn.net/so/search?q=ModuleNotFoundError&spm=1001.2101.3001.7020): No module named ‘huggingface_hub.**
+
+解决：pip install -U sentence-transformers
+
+
+
+**2.npm  run dev出现这样的报错，一般是node版本不匹配，过低的原因**
+
+解决：升级node
+
+```
+sudo npm install -g n
+sudo n [version.number]
+```
+
+**3.npm install报错**
+
+[npm istall 安装报错解决指南看着一篇就够了_npm install force-CSDN博客](https://blog.csdn.net/qq_24373725/article/details/136247395)
+
+
+
+**4.Error /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34’ not found**
+
+解决：参照[version `GLIBC_2.34‘ not found简单有效解决方法_glibc 2.34 not found-CSDN博客](https://blog.csdn.net/huazhang_001/article/details/128828999#:~:text=根据提供的文件信息，)
+
+
+
+**5.若python main.py报错 `cannot instantiate ‘PosixPath‘ on your system`，在main.py中开头添加**
+
+```
+import platform
+import pathlib
+plt = platform.system()
+if plt != 'Windows':
+  pathlib.WindowsPath = pathlib.PosixPath
+#todo for linux
+```
+

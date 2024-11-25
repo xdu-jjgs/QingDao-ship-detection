@@ -28,10 +28,10 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
         ship_detector = LWIRShipDetector('./ckpt/best_ship_det_infra_8_30.pt', src_rtsp_url)
     else:
         #ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url)
-        ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url, 0)
+        ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url, url_id)
     if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
         #text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt')
-        text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt', 0)
+        text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt', url_id)
         text_recognizer = PaddleRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt')
     ship_tracker = ShipTracker(camera_pos)
     ship_tracker.reset()
@@ -98,7 +98,7 @@ def getBboxAndRecordEvents(
     t5 = time.perf_counter()
 
     # 将计时结果写入日志文件
-    with open(f'./infer_time/execute_time_2streams_id{url_id}-24-10-28.txt', 'a') as f:
+    with open(f'./infer_time/execute_time_4streams_id{url_id}-24-11-25.txt', 'a') as f:
         original_stdout = sys.stdout
         sys.stdout = f 
         now = datetime.now()

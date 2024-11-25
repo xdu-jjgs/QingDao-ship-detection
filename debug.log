@@ -1,0 +1,12 @@
+
+# 启动rtsp服务器
+./mediamtx
+
+# ffmpeg 模拟光电设备推流命令 (-vcodec libx264 强制将视频编码转换为h264编码)
+ffmpeg -re -stream_loop -1 -i /media/F/yangzewei/QingDao_projrect/QingDao-ship-detection/videos/shift2center.mp4  -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i /media/F/yangzewei/QingDao_projrect/QingDao-ship-detection/videos/16楼航道近景-2x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input2
+ffmpeg -re -stream_loop -1 -i /media/F/yangzewei/QingDao_projrect/QingDao-ship-detection/videos/16楼-远景x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input3
+ffmpeg -re -stream_loop -1 -i /media/F/yangzewei/QingDao_projrect/QingDao-ship-detection/videos/test.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input4
+
+# 目前的修改:
+# run_group.py keep_detect_group.py model_group.py (有带group后缀的)这些文件是改为采用batch推理的方法, 但是仍然存在许多bug, 因此仍然保留原来单张图片的推理方式(不带group后缀的)
