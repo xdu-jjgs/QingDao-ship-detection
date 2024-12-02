@@ -2,8 +2,6 @@ import json
 import logging
 import os
 import time
-import sys
-from datetime import datetime
 import cv2
 import numpy as np
 import requests
@@ -12,13 +10,20 @@ from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, Pad
 # from model_with_log import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, PaddleRecognizer
 
 from utils import VideoCapture, CameraPos
+# added for alarm logits
+from utils import check_ship_name_from_input, get_over_speed_ships, is_shiptext_in_shipbox, match_shiptext2ship
 from constant import semaphore, data_url, inferred_data, trk_id2snapshoted, snapshot_url, http_host, http_port, ship_trackers, infer_worker_threads, websocket_connections
 
 
 
 
-def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoCapture, url_id: int):
 
+
+
+
+def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoCapture, url_id: int):
+    '''inferOneVideo每路视频单独开一个线程
+    '''
     ship_detector = None
     text_detector = None
     text_recognizer = None
@@ -37,7 +42,11 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
     ship_tracker.reset()
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id
     ship_trackers[src_rtsp_url] = ship_tracker
-    
+
+    # 已经报警和尚未报警的ID列表(目前只有超速这一异常行为)
+    # TODO: 定期清理僵尸id
+    alarmed_id_lists, frame_id_lists = [], []
+
     try:
         while infer_worker_threads[src_rtsp_url]:
             ret, frame = video_capture.read()
@@ -45,8 +54,17 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
             if not ret:
                 continue
             else:
-                getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, url_id)
-            
+                ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer)
+                # 超速行为异常检测
+                frame_id_lists = get_over_speed_ships(ship_dict, 5)
+                # TODO: 船牌缺失异常检测
+                # 当前报警ID相对于已经报警ID的差集, 对这些差集报警即可，集合为空则不需要报警 
+                tobe_alarm_id_list = set(frame_id_lists) - set(alarmed_id_lists)    
+                # TODO: 报警行为
+                # 更新已经报警的ID列表
+                alarmed_id_lists = list(set(alarmed_id_lists + frame_id_lists)) 
+                # print(alarmed_id_lists)
+
             time.sleep(0.001)
 
     finally:
@@ -58,56 +76,24 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
 
 
 
+
+
+
+
 # 推理并记录
-def getBboxAndRecordEvents(
-        frame: np.ndarray, 
-        src_rtsp_url:str, 
-        ship_detector:ShipDetector, 
-        ship_tracker:ShipTracker, 
-        text_detector:TextDetector, 
-        text_recognizer:PaddleRecognizer,
-        url_id
-        ):
+def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url:str, ship_detector:ShipDetector, ship_tracker:ShipTracker, text_detector:TextDetector, text_recognizer:PaddleRecognizer):
 
     height, width = frame.shape[:2]
-
-    t1 = time.perf_counter()
     ship_bboxes = ship_detector(frame)
-    t2 = time.perf_counter()
     ship_tboxes = ship_tracker(frame, ship_bboxes)
-
-    # 将文字识别部分跳帧
-    t3 = time.perf_counter()
     text_bboxes = text_detector(frame) if text_detector is not None else []
-
-    #todo for 筛选船牌
-    new_text_bboxes=[]#创建一个空列表
-    for j in range(len(text_bboxes)):#遍历所有船牌
-        count=0
-        for i in range(len(ship_bboxes)):#船牌j遍历所有船体，看船牌j是否在这一帧中的某个船体内
-            if(ship_bboxes[i].x0 <=text_bboxes[j].x0 and ship_bboxes[i].x1>=text_bboxes[j].x1 
-               and ship_bboxes[i].y0<=text_bboxes[j].y0 and ship_bboxes[i].y1>=text_bboxes[j].y1):#判断船牌是否在船体内
-                count=count+1
-        if count>0:#count>0表示船牌j至少在某个船体内
-            new_text_bboxes.append(text_bboxes[j])#保存在船体内的船牌
+    '''筛选船牌逻辑(YZW)'''
+    text_bboxes = is_shiptext_in_shipbox(text_bboxes, ship_bboxes)
+    # 船牌识别
+    ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []# 船牌文字识别与生成
     
-    text_bboxes = new_text_bboxes#将筛选后的船牌框列表重新赋值给text_bboxes 
-
-    t4 = time.perf_counter()
-    ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []
-    t5 = time.perf_counter()
-
-    # 将计时结果写入日志文件
-    with open(f'./infer_time/execute_time_4streams_id{url_id}-24-11-27.txt', 'a') as f:
-        original_stdout = sys.stdout
-        sys.stdout = f 
-        now = datetime.now()
-        formatted_date = now.strftime('%Y-%m-%d %H:%M:%S')
-        print(f"Date: {formatted_date}, ship detection inference time: {t2-t1:.5f} s")
-        print(f"Date: {formatted_date}, ship tracking inference time: {t3-t2:.5f} s")
-        print(f"Date: {formatted_date}, ship text detection inference time: {t4-t3:.5f} s")
-        print(f"Date: {formatted_date}, ship text ocr inference time: {t5-t4:.5f} s")
-        sys.stdout = original_stdout
+    '''匹配船ID和船牌逻辑(YZW)'''
+    ship_dict = match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts)
 
     # 将推理结果存入共享数据
     inferred_data[src_rtsp_url] = {
@@ -152,3 +138,6 @@ def getBboxAndRecordEvents(
 
     # 清理帧
     # del frame
+    # 为异常检测添加的返回
+    return ship_dict      
+

@@ -5,7 +5,7 @@ import websockets
 import requests
 import json
 
-# from keep_detect import inferOneVideo
+# from keep_detect_alarm import inferOneVideo
 from keep_detect_with_log import inferOneVideo
 from utils import CameraPos, VideoCapture
 from ws_handler import handle_ws_connection

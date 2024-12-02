@@ -203,3 +203,94 @@ class CustomThreadPoolExecutor(ThreadPoolExecutor):
             return future
         else:
             return super().submit(fn, *args, **kwargs)
+
+
+
+
+
+
+def check_ship_name_from_input(ship_dict, input_name):
+    """判断从接口传入的船牌名字是否与字典中任何船只名字相同(目前未使用)
+
+    :param ship_dict: 包含所有船只信息的字典
+    :param input_name: 从接口传入的船牌名字
+    :return: 如果有匹配的船只，返回 True，否则返回 False
+    """
+    # 遍历字典，查找是否有匹配的船牌名字
+    for ship_id, ship_info in ship_dict.items():
+        if ship_info['text_bbox_words'] == input_name:
+            # 找到匹配的船只
+            return True  
+    # 没有匹配的船只
+    return False  
+
+
+
+def get_over_speed_ships(ship_dict, max_speed):
+    """获取超速的船只
+
+    :param ship_dict: 包含所有船只信息的字典
+    :param max_speed: 最大允许速度（单位可以是节（knots）、米/秒等）
+    :return: 超速的船只 ID 列表
+    """
+    over_speed_ships_id = []
+
+    # 遍历船只字典
+    for ship_id, ship_info in ship_dict.items():
+        # 获取船只的实际速度
+        ship_speed = ship_info['speed']  
+        # 判断是否超速
+        if ship_speed > max_speed:
+            # 记录超速的船只 ID
+            over_speed_ships_id.append(ship_id)  
+
+    return over_speed_ships_id
+
+
+
+def is_shiptext_in_shipbox(text_bboxes, ship_bboxes):
+    '''筛选不在船体内船牌的逻辑(YZW)
+    '''
+    new_text_bboxes = []
+    # 遍历所有船牌
+    for j in range(len(text_bboxes)):
+        count=0
+        # 船牌j遍历所有船体，看船牌j是否在这一帧中的某个船体内
+        for i in range(len(ship_bboxes)):
+            # 判断船牌是否在船体内
+            if(ship_bboxes[i].x0 <=text_bboxes[j].x0 and ship_bboxes[i].x1>=text_bboxes[j].x1 
+               and ship_bboxes[i].y0<=text_bboxes[j].y0 and ship_bboxes[i].y1>=text_bboxes[j].y1):
+                count += 1
+        # count > 0 表示船牌j至少在某个船体内
+        if count > 0:
+            # 保存在船体内的船牌
+            new_text_bboxes.append(text_bboxes[j])
+    # 将筛选后的船牌框列表重新赋值给text_bboxes 
+    return new_text_bboxes
+
+
+
+def match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts):
+    '''匹配船ID和船牌逻辑(YZW)
+    '''
+    # 船和船牌的字典
+    ship_dict = {}
+    # 遍历 ship_tboxes 列表中的每个 ShipTrackingBox 对象
+    for tbox in ship_tboxes: 
+        # 船舶的边界框坐标
+        bbox = (tbox.x0, tbox.y0, tbox.x1, tbox.y1)   
+
+        # 船牌坐标和文字，默认为空
+        text_bbox, text_bbox_words = None, None
+        # 遍历船牌, 进行船牌-船体一对一匹配
+        for j in range(len(text_bboxes)):
+            # 判断船牌是否在当前船体内
+            if(tbox.x0 <= text_bboxes[j].x0 and tbox.x1 >= text_bboxes[j].x1 and tbox.y0 <= text_bboxes[j].y0 and tbox.y1 >= text_bboxes[j].y1):
+                text_bbox_words = ocr_texts[j]
+                # 一旦找到船牌在框内, 跳出循环
+                break  
+        # 将船舶信息添加到字典中, key 为 ID，value 为 (bbox, cls, speed)
+        ship_dict[tbox.id] = {'bbox':bbox, 'cls':tbox.cls, 'speed':tbox.speed, 'text_bbox_words':text_bbox_words}
+
+    return ship_dict
+
