@@ -37,8 +37,8 @@ class ShipBoundingBox:
 
 # 长波红外船舶检测模型
 class LWIRShipDetector:
-    def __init__(self, weight: str, src_rtsp_url: str):
-        self.device = select_device('')
+    def __init__(self, weight: str, src_rtsp_url: str, device_id: int=0):
+        self.device = f'cuda:{device_id}'
         self.model = attempt_load(weight, device=self.device)
         self.imgsz = 1280
         self.score_thres = 0.25

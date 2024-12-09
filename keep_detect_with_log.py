@@ -13,12 +13,13 @@ from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, Pad
 
 from utils import VideoCapture, CameraPos
 from constant import semaphore, data_url, inferred_data, trk_id2snapshoted, snapshot_url, http_host, http_port, ship_trackers, infer_worker_threads, websocket_connections
+import multiprocessing
 
 
 
-
-def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoCapture, url_id: int):
-
+def inferOneVideo(src_rtsp_url:str, url_id: int):
+    camera_pos = CameraPos('29')
+    video_capture = VideoCapture(src_rtsp_url)
     ship_detector = None
     text_detector = None
     text_recognizer = None
@@ -38,22 +39,17 @@ def inferOneVideo(src_rtsp_url:str, camera_pos: CameraPos, video_capture: VideoC
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id
     ship_trackers[src_rtsp_url] = ship_tracker
     
-    try:
-        while infer_worker_threads[src_rtsp_url]:
-            ret, frame = video_capture.read()
-            
-            if not ret:
-                continue
-            else:
-                getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, url_id)
-            
-            time.sleep(0.001)
 
-    finally:
-        camera_pos.release()
-        video_capture.release()
-        del infer_worker_threads[src_rtsp_url]
-        logging.debug(f"{src_rtsp_url}模型推理结束...")
+    while True:
+        ret, frame = video_capture.read()
+        
+        if not ret:
+            continue
+        else:
+            pass
+            getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, url_id)
+        
+        time.sleep(0.001)
 
 
 
@@ -98,7 +94,7 @@ def getBboxAndRecordEvents(
     t5 = time.perf_counter()
 
     # 将计时结果写入日志文件
-    with open(f'./infer_time/execute_time_4streams_id{url_id}-24-11-27.txt', 'a') as f:
+    with open(f'./infer_time/execute_time_4streams_new_id{url_id}-24-12-2.txt', 'a') as f:
         original_stdout = sys.stdout
         sys.stdout = f 
         now = datetime.now()
@@ -108,7 +104,6 @@ def getBboxAndRecordEvents(
         print(f"Date: {formatted_date}, ship text detection inference time: {t4-t3:.5f} s")
         print(f"Date: {formatted_date}, ship text ocr inference time: {t5-t4:.5f} s")
         sys.stdout = original_stdout
-
     # 将推理结果存入共享数据
     inferred_data[src_rtsp_url] = {
         'ship_bboxes': ship_bboxes,

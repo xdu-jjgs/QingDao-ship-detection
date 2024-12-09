@@ -10,9 +10,9 @@ from tqdm import tqdm
 # ship text ocr inference time
 
 pattern = r'\b\d+\.\d+\b'
-name = 'ship text ocr inference time'
+name = 'ship detection inference time'
 model_pred_times_1 = []
-with open ('infer_time/execute_time_2streams_id1-24-11-20.txt', 'r') as txt:
+with open ('infer_time/execute_time_4streams_new_id1-24-12-2.txt', 'r') as txt:
     lines = txt.readlines()
     for step, line in tqdm(enumerate(lines)):
         pred_model_idx = line.find(name)
@@ -26,4 +26,4 @@ with open ('infer_time/execute_time_2streams_id1-24-11-20.txt', 'r') as txt:
 plt.plot(model_pred_times_1)
 plt.ylim(0, 0.2)
 plt.title(name)
-plt.savefig(f'./infer_time/id1_{name}_24-11-20.jpg', dpi=150)
+plt.savefig(f'./infer_time/id1_{name}_24-12-2.jpg', dpi=150)

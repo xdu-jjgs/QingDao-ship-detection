@@ -10,6 +10,7 @@ import requests
 
 from constant import cctv_parameters_interface, base_reconnect_time, max_reconnect_time
 
+import multiprocessing
 # 单开一个线程读取最新的视频帧
 class VideoCapture:
     def __init__(self, src_rtsp_url):
@@ -17,7 +18,7 @@ class VideoCapture:
         self.cap = cv2.VideoCapture(src_rtsp_url)
         self.ret = False
         self.cur_frame = None
-        self.stop_event = threading.Event()
+        self.stop_event = multiprocessing.Event()
         self.reconnect_time = base_reconnect_time
         self.thread = threading.Thread(target=self._reader, daemon=True, name='VideoCapture')
         self.thread.start()
@@ -52,15 +53,16 @@ class VideoCapture:
         self.thread.join()
         self.cap.release()   
         # time.sleep(0.1)
-    
+
+import multiprocessing
 # 获取摄像头参数单独开一个线程发请求获取
 class CameraPos:
     def __init__(self, video_id):
         self.tilt = None
         self.zoom = None
         self.video_id = video_id
-        self.stop_event = threading.Event()
-        self.update_event = threading.Event()  # 用于线程间通信的信号量
+        self.stop_event = multiprocessing.Event()
+        self.update_event = multiprocessing.Event()  # 用于线程间通信的信号量
         self.thread = threading.Thread(target=self.request_camera_ptz, daemon=True, name='CamearPos')
         self.thread.start()
 
