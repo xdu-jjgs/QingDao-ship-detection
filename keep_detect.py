@@ -1,17 +1,22 @@
-import json
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import time
 import cv2
 import numpy as np
-import requests
 
-from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, PaddleRecognizer
-from utils import VideoCapture, CameraPos, get_over_speed_ships, is_shiptext_in_shipbox, match_shiptext2ship
-from constant import semaphore, data_url, inferred_data, trk_id2snapshoted, snapshot_url, http_host, http_port, ship_trackers, infer_worker_threads, websocket_connections
+from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, TextRecognizer
+from utils import VideoCapture, CameraPos, is_shiptext_in_shipbox, match_shiptext2ship
+from constant import speed_threshold
 
-def inferOneVideo(src_rtsp_url: str, url_id: int):
+def save_frame_with_annotations(frame, annotations, filename):
+    for annotation in annotations:
+        x0, y0, x1, y1 = annotation
+        cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 0, 255), 2)
+    cv2.imwrite(filename, frame)
 
+def inferOneVideo(src_rtsp_url: str, url_id: int, websocket_connections, inferred_data, ship_trackers, data_url, semaphore):
+    
     # todo 根据rtsp_url拆分出要查询那个摄像头的参数-需要cms先设计好光电设备管理的功能
     # ccvt_id, video_id, video_type = url.split('_')
     # print(ccvt_id, video_id, video_type)
@@ -27,22 +32,25 @@ def inferOneVideo(src_rtsp_url: str, url_id: int):
 
     # todo 根据 src_rtsp_url 判断使用白光还是红外模型-长波红外和短波红外的处理不同
     if src_rtsp_url == 'rtsp://192.168.101.190:554/test_173':
-        ship_detector = LWIRShipDetector('./ckpt/best_ship_det_infra_8_30.pt', src_rtsp_url)
+        ship_detector = LWIRShipDetector('./best_ship_det_infra_8_30.pt', device_id=url_id)
     else:
-        #ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url)
-        ship_detector = ShipDetector('./ckpt/best_ship_det_m_8_22.pt', src_rtsp_url, url_id)
+        ship_detector = ShipDetector('./best_ship_det_m_8_22.pt', device_id=url_id)
+
     if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
-        #text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt')
-        text_detector = TextDetector('./ckpt/best_text_det_n_6_19.pt', url_id)
-        text_recognizer = PaddleRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt')
+        text_detector = TextDetector('./best_text_det_n_6_19.pt', device_id=url_id)
+        text_recognizer = TextRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt', device_id=url_id)
+
     ship_tracker = ShipTracker(camera_pos)
     ship_tracker.reset()
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id
-    ship_trackers[src_rtsp_url] = ship_tracker
+    # ship_trackers[src_rtsp_url] = ship_tracker
 
-    # 已经报警和尚未报警的ID列表(目前只有超速这一异常行为)
-    # TODO: 定期清理僵尸id
-    alarmed_id_lists, frame_id_lists = [], []
+    # 已经报警的 ID 列表
+    # TODO: 定期清理 list, 不然会无限增长
+    # TODO: 确认 ship_id 什么时候大更新, 大更新时已报警的 ID 列表重置为 []
+    alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
+    # 创建一个用于发送数据
+    executor = ThreadPoolExecutor(max_workers=3)
 
     while True:
         ret, frame = video_capture.read()
@@ -50,29 +58,57 @@ def inferOneVideo(src_rtsp_url: str, url_id: int):
         if not ret:
             continue
         else:
-            pass
-            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer)
-            # 超速行为异常检测
-            frame_id_lists = get_over_speed_ships(ship_dict, 5)
-            # todo:接驳行为异常检测
-            frame_id_lists += []
-            # TODO: 船牌缺失异常检测
-            frame_id_lists += []
-            # 当前报警ID相对于已经报警ID的差集, 对这些差集报警即可，集合为空则不需要报警 
-            tobe_alarm_id_list = set(frame_id_lists) - set(alarmed_id_lists) 
+            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, inferred_data, data_url, semaphore, websocket_connections)
             
-            # !!!!!!
-            # print(tobe_alarm_id_list)
-            # TODO: 调用事件上报接口
-            # print('调用事件上报接口')
+            # 异常行为检测
+            over_speed_ships_id, jiebo_ships_id, missing_name_ships_id = [], [], []
+            
+            for ship_id, ship_info in ship_dict.items():
+                # 检测超速行为
+                if ship_info.get("speed") > speed_threshold:
+                    over_speed_ships_id.append(ship_id)
+                # 检查接驳行为
+                if ship_info.get("cls") == 13:
+                    jiebo_ships_id.append(ship_id)
+                # 检查船牌缺失
+                if ship_info.get("text_bbox_words") is None:
+                    missing_name_ships_id.append(ship_id)
+            
+            # 当前报警ID相对于已经报警ID的差集, 对这些差集报警即可，集合为空则不需要报警 
+            tobe_alarm_over_spped_id_list = list(set(over_speed_ships_id) - set(alarmed_over_speed_id_lists))
+            tobe_alarm_jiebo_id_list = list(set(jiebo_ships_id) - set(alarmed_jiebo_id_lists))
+            tobe_alarm_missing_name_id_list = list(set(missing_name_ships_id) - set(alarmed_missing_name_id_lists))
+            print(len(alarmed_over_speed_id_lists), len(alarmed_jiebo_id_lists), len(alarmed_missing_name_id_lists))
+            # TODO: 调用事件上报接口, 存储图片
+            os.makedirs('snap_shot_dir/over_speed_event', exist_ok=True)
+            os.makedirs('snap_shot_dir/jiebo_event', exist_ok=True)
+            os.makedirs('snap_shot_dir/missing_name_event', exist_ok=True)
+            timestamp = int(time.time())
+
+            if tobe_alarm_over_spped_id_list:
+                over_speed_frame = frame.copy()
+                over_speed_annotations = [ship_dict.get(ship_id).get("bbox") for ship_id in tobe_alarm_over_spped_id_list]
+                executor.submit(save_frame_with_annotations, over_speed_frame, over_speed_annotations, f"snap_shot_dir/over_speed_event/over_speed_{timestamp}.jpg")
+            if tobe_alarm_jiebo_id_list:
+                jiebo_frame = frame.copy()
+                jiebo_annotations = [ship_dict.get(ship_id).get("bbox") for ship_id in tobe_alarm_jiebo_id_list]
+                executor.submit(save_frame_with_annotations, jiebo_frame, jiebo_annotations, f"snap_shot_dir/jiebo_event/jiebo_{timestamp}.jpg")
+            if tobe_alarm_missing_name_id_list:
+                missing_name_frame = frame.copy()
+                missing_name_annotations = [ship_dict.get(ship_id).get("bbox") for ship_id in tobe_alarm_missing_name_id_list]
+                executor.submit(save_frame_with_annotations, missing_name_frame, missing_name_annotations, f"snap_shot_dir/missing_name_event/missing_name_{timestamp}.jpg")
+            # TODO: 调用事件上报接口, 存储结构化数据
+            logging.debug('TODO: 调用事件上报接口, 存储结构化数据')
             # 更新已经报警的ID列表
-            alarmed_id_lists = list(set(alarmed_id_lists + frame_id_lists)) 
+            alarmed_over_speed_id_lists = list(set(alarmed_over_speed_id_lists + tobe_alarm_over_spped_id_list)) 
+            alarmed_jiebo_id_lists = list(set(alarmed_jiebo_id_lists + tobe_alarm_jiebo_id_list)) 
+            alarmed_missing_name_id_lists = list(set(alarmed_missing_name_id_lists + tobe_alarm_missing_name_id_list)) 
 
         time.sleep(0.001)
 
 
 # 运行神经网络推理并记录
-def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: PaddleRecognizer):
+def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer, inferred_data, data_url, semaphore, websocket_connections):
 
     height, width = frame.shape[:2]
 
@@ -90,7 +126,7 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
     '''匹配船ID和船牌逻辑(YZW)'''
     ship_dict = match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts)
 
-    # 将推理结果存入共享数据
+    # 使用dict的原子操作更新数据
     inferred_data[src_rtsp_url] = {
         'ship_bboxes': ship_bboxes,
         'ship_tboxes': ship_tboxes,
@@ -100,39 +136,12 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
         "height": height,
     }
 
-    # 如果当前有用户在查看 src_rtsp_url 的AI画面，则通过信号量通知 inferCreate 返回数据
-    if any(src_rtsp_url in connection['rtsp_urls'] for connection in websocket_connections.values()):
-        data_url._data_url = src_rtsp_url
+    # 通知主进程有新数据可读
+    if any(src_rtsp_url in connection for connection in websocket_connections.values()):
+        data_url.value = src_rtsp_url
         semaphore.release()
-
-    # 预警事件记录
-    def snapshot():
-        for tbox in ship_tboxes:
-            if trk_id2snapshoted[tbox.id]:
-                continue
-            trk_id2snapshoted[tbox.id] = True
-            snapshot_name = f'ship-{tbox.id}.png'
-            logging.info('快照创建成功')
-            cv2.imwrite(os.path.join('static', snapshot_name),
-                        frame[tbox.y0:tbox.y1, tbox.x0:tbox.x1])
-            # 通过HTTP POST请求将快照的信息发送到服务器snapshot_url上，默认由static的地址映射而来
-            rsp = requests.post(
-                snapshot_url,
-                data=json.dumps({
-                    'snapshot_url': f'http://{http_host}:{http_port}/{snapshot_name}',
-                    'id': tbox.id,
-                }),
-                headers={
-                    'Content-Type': 'application/json',
-                })
-            if rsp.status_code == 200:
-                logging.info('快照传输成功')
-            else:
-                logging.info('快照传输失败')
-    # snapshot_thread = threading.Thread(target=snapshot)
-    # snapshot_thread.start()
 
     logging.debug(f"{src_rtsp_url}推理并记录事件中...")
 
     # 为异常检测添加的返回
-    return ship_dict      
+    return ship_dict

@@ -86,12 +86,12 @@ if __name__ == '__main__':
         # 'infer',
         # 'tracker',
         # 'ppocr',
-        'constant.py',
-        'keep_detect.py',
-        'model.py',
-        'run.py',
-        'utils.py',
-        'ws_handler.py'
+        # 'constant.py',
+        # 'keep_detect.py',
+        # 'model.py',
+        # 'run.py',
+        # 'utils.py',
+        # 'ws_handler.py'
     ]
     all_py_files = find_all_files(compile_path)
     # 编译每个文件，跳过出错的文件

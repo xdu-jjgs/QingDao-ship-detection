@@ -103,7 +103,7 @@ class LWIRShipDetector:
 
 # 船舶检测模型
 class ShipDetector:
-    def __init__(self, weight: str, src_rtsp_url: str, device_id=0):
+    def __init__(self, weight: str, device_id=0):
         # 不知道为啥select_device无论是0还是1结果都是0，所以不要这个函数。干脆手动设置
         # self.device = select_device(str(device_id))
         self.device = f'cuda:{device_id}'
@@ -111,7 +111,6 @@ class ShipDetector:
         self.imgsz = 1280
         self.score_thres = 0.25
         self.iou_thres = 0.3
-        self.src_rtsp_url = src_rtsp_url
 
     def __call__(self, frame: np.ndarray) -> List[ShipBoundingBox]:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -339,7 +338,7 @@ class TextDetector:
 
 
 
-class PaddleRecognizer:
+class TextRecognizer:
     def __init__(self, onnx_weight_path:str, character_dict_path=None, device_id:int=0, use_space_char=True):
         '''
         Args:

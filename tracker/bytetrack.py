@@ -12,21 +12,16 @@ class ByteTrack(BaseTracker):
         self.low_conf_thresh = max(0.15, conf_thresh - 0.3)  # low threshold for second matching
         self.filter_small_area = True  # filter area < 50 bboxs
         self.loc = defaultdict(list)
-        self.camera_height = 45   # 摄像头距离拍摄对象水平面的垂直高度 (m)
         self.sensor_w = sensor_w  # 摄像机传感器宽度 (mm)
         self.sensor_h = sensor_h  # 摄像机传感器高度 (mm)
         self.image_w = image_w    # 图像宽度 (pixels)
         self.image_h = image_h
-        self.zoom = zoom/100      # 摄像头焦距 (mm)
-        self.tilt = np.deg2rad(tilt/100)    # 摄像头俯仰角(转换为弧度)
-        self.phi = 2 * np.arctan(sensor_h / (2*zoom))  # 摄像头垂直视场角
+        self.zoom = zoom / 100      # 摄像头焦距 (mm)
+        self.tilt = np.deg2rad(tilt / 100)    # 摄像头俯仰角(转换为弧度)
+        self.phi = 2 * np.arctan(sensor_h / (2 * zoom))  # 摄像头垂直视场角
         self.frame_rate = frame_rate
         self.max_frame_id = 65536 # prevent frame_id from keeping increasing
-        self.s2c = Shift2Center(img_size=(image_w,image_h))
-
-
-
-
+        # self.s2c = Shift2Center(img_size=(image_w,image_h))
 
     def update(self, det_results, ori_img):
         """
@@ -190,8 +185,6 @@ class ByteTrack(BaseTracker):
 
         return [track for track in self.tracked_stracks if track.is_activated], [track for track in self.lost_stracks], []
 
-
-
     def get_ratio_pixel_to_real(self):
         """计算每像素对应的实际距离比例"""
         h_angle = np.arctan(self.sensor_w / (2 * self.zoom))
@@ -202,17 +195,12 @@ class ByteTrack(BaseTracker):
         
         return real_width / self.image_w
 
-
-
     def get_scale(self, loc):
         '''估算当前坐标相比于画面中心点的相对速度比例因子'''
         loc = np.array(loc)
         # 任意坐标相比于画面中心点的相对速度:
         scale = np.tan(self.tilt) / np.tan(self.tilt + ((loc[1] - self.image_h/2) / self.image_h) * self.phi)
         return scale
-
-
-
 
     @property
     def get_speed(self):
@@ -233,8 +221,6 @@ class ByteTrack(BaseTracker):
                 speed[trk_id] = 0
 
         return speed
-
-
 
 def joint_stracks(tlista, tlistb):
     exists = {}

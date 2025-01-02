@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import logging
@@ -9,46 +8,58 @@ from websockets import WebSocketServerProtocol
 from typing import Tuple
 from typing import List
 
-from constant import speed_threshold, cctv_frame_track_interface, semaphore, data_url, inferred_data, ship_trackers, websocket_connections
+from constant import speed_threshold, cctv_frame_track_interface
 from utils import CameraMoveStatus, CustomThreadPoolExecutor
 
+websocket_connections_detail = {}
+
 # 处理 框选跟踪 和 查看AI标注框 命令
-def handleStartAndSelectCommand(websocket: WebSocketServerProtocol, rtsp_urls: List[str], user_selections):
+def handleStartAndSelectCommand(ws_id: str, websocket: WebSocketServerProtocol, rtsp_urls: List[str], user_selections, websocket_connections, inferred_data, data_url, semaphore):
     for rtsp_url in rtsp_urls:
         # 初始化要存储的 ws 连接状态数据
-        if websocket not in websocket_connections:
-            websocket_connections[websocket] = {
+        if ws_id not in websocket_connections.keys():
+            websocket_connections_detail[ws_id] = {
                 'rtsp_urls': set(),
-                'user_selection_cache':{}, # 用于存储本次命令用户选中的ship_id
-                'selected_cache': {}  # 用于存储用户已经选中的ship_id，后续自动跟踪使用
+                'user_selection_cache': {},
+                'selected_cache': {},
+                'task': None
             }
+        
         # 初始化当前 selected_cache
-        websocket_connections[websocket]['selected_cache'][rtsp_url] = { "video_id": None, "id": None }
+        websocket_connections_detail[ws_id]['selected_cache'][rtsp_url] = { "video_id": None, "id": None }
         # 更新当前用户选中的船
-        websocket_connections[websocket]['user_selection_cache'][rtsp_url] = user_selections
+        websocket_connections_detail[ws_id]['user_selection_cache'][rtsp_url] = user_selections
         # 添加当前 WebSocket 到集合中
-        websocket_connections[websocket]['rtsp_urls'].add(rtsp_url) # 查看当前视频流的 websocket 有哪些
+        websocket_connections_detail[ws_id]['rtsp_urls'].add(rtsp_url) # 查看当前视频流的 websocket 有哪些
+        websocket_connections[ws_id] = websocket_connections_detail[ws_id]['rtsp_urls']
+       
         # 启动处理任务（如果尚未启动）
-        if 'task' not in websocket_connections[websocket]:
+        if websocket_connections_detail[ws_id]['task'] is None:
             # 创建新的处理任务，并添加到任务列表中
-            task = asyncio.create_task(ws_response_task(websocket, websocket_connections[websocket]['rtsp_urls'],
-                websocket_connections[websocket]['selected_cache'], websocket_connections[websocket]['user_selection_cache']))
-            websocket_connections[websocket]['task'] = task
+            task = asyncio.create_task(ws_response_task(websocket, websocket_connections_detail[ws_id]['rtsp_urls'],
+                websocket_connections_detail[ws_id]['selected_cache'], websocket_connections_detail[ws_id]['user_selection_cache'], inferred_data, data_url, semaphore))
+            websocket_connections_detail[ws_id]['task'] = task
 
 # 处理 停止发送数据 命令
-def handleStopCommand(websocket: WebSocketServerProtocol, rtsp_urls: List[str]):
+def handleStopCommand(ws_id: str, rtsp_urls: List[str], websocket_connections):
     for rtsp_url in rtsp_urls:
-        if websocket in websocket_connections:
-            if rtsp_url in websocket_connections[websocket]['rtsp_urls']: 
-                websocket_connections[websocket]['rtsp_urls'].remove(rtsp_url)
-                if not websocket_connections[websocket]['rtsp_urls']:
-                    websocket_connections[websocket]['task'].cancel()
-                    del websocket_connections[websocket]['task']  # 删除任务
+        if ws_id in websocket_connections_detail:
+            if rtsp_url in websocket_connections_detail[ws_id]['rtsp_urls']: 
+                websocket_connections_detail[ws_id]['rtsp_urls'].remove(rtsp_url)
+                websocket_connections[ws_id].remove(rtsp_url)
+                if not websocket_connections_detail[ws_id]['rtsp_urls']:
+                    websocket_connections_detail[ws_id]['task'].cancel()
+                    del websocket_connections_detail[ws_id]['task']  # 删除任务
+                    websocket_connections.pop(ws_id)  # 删除当前 ws 连接对象
                     print(f"Task for {rtsp_url} cancelled.")
 
 # 处理 websocket 连接
-async def handle_ws_connection(websocket: WebSocketServerProtocol):
+async def handle_ws_connection(websocket: WebSocketServerProtocol, websocket_connections, inferred_data, data_url, semaphore):
+
+    # 生成唯一的ws_id
+    ws_id = str(id(websocket))
     rtsp_urls = []
+
     try:
         async for message in websocket:
             user_selections = None
@@ -74,37 +85,36 @@ async def handle_ws_connection(websocket: WebSocketServerProtocol):
 
             # 处理 框选跟踪 和 查看AI标注框 命令
             if 'command' in data and (data['command'] == 'start' or data['command'] =='select'):
-                handleStartAndSelectCommand(websocket, rtsp_urls, user_selections)
+                handleStartAndSelectCommand(ws_id, websocket, rtsp_urls, user_selections, websocket_connections, inferred_data, data_url, semaphore)
 
             # 处理 停止发送数据 命令
             elif 'command' in data and data['command'] == 'stop':
-                handleStopCommand(websocket, rtsp_urls)
+                handleStopCommand(ws_id, rtsp_urls, websocket_connections)
 
     except Exception as e:
         logging.debug(f"Error handling stream: {e}")
 
     finally:
-        handleStopCommand(websocket, rtsp_urls)
+        handleStopCommand(ws_id, rtsp_urls, websocket_connections)
         # 从连接池删除当前 ws 连接对象
-        if websocket in websocket_connections:
-            del websocket_connections[websocket]
+        if ws_id in websocket_connections:
+            websocket_connections.pop(ws_id)
 
 # 创建websocket返回消息的异步任务
-async def ws_response_task(websocket, rtsp_urls, selected_cache, user_selection_cache):
+async def ws_response_task(websocket, rtsp_urls, selected_cache, user_selection_cache, inferred_data, data_url, semaphore):
     try:
         send_tasks = []
-        task = response_process_worker(websocket, rtsp_urls, selected_cache, user_selection_cache)
+        task = response_process_worker(websocket, rtsp_urls, selected_cache, user_selection_cache, inferred_data, data_url, semaphore)
         send_tasks.append(task)
         await asyncio.gather(*send_tasks)
         await asyncio.sleep(0.001)
     except asyncio.CancelledError:
         print(f"WS Message sending was cancelled.")
-
     finally:
         print(f"Stopped sending ws message")
 
 # 处理生成要通过websocket返回的标注数据
-async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user_selection_cache:dict):
+async def response_process_worker(websocket, rtsp_urls, selected_cache:dict, user_selection_cache:dict, inferred_data, data_url, semaphore):
     try:
         # 创建一个线程池, 相同rtsp_url的多个任务不等待直接丢弃
         executor = CustomThreadPoolExecutor(max_workers=9)
@@ -117,10 +127,13 @@ async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user
 
         # 先不管信号量，直接发送一次数据
         for rtsp_url in rtsp_urls:
-            detections = bbox_process(rtsp_url)
-            init_data[rtsp_url] = detections 
-        await websocket.send(json.dumps(init_data))
-        await asyncio.sleep(0.001)
+            # 安全地从共享字典获取数据
+            if rtsp_url in inferred_data.keys():
+                detections = bbox_process(rtsp_url, inferred_data)
+                init_data[rtsp_url] = detections 
+        if init_data:
+            await websocket.send(json.dumps(init_data))
+            await asyncio.sleep(0.001)
 
         # 根据信号量发送数据
         while True:
@@ -128,12 +141,16 @@ async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user
 
             data = {}
             for rtsp_url in rtsp_urls:
-                if rtsp_url != data_url._data_url: continue
+                if rtsp_url != data_url.value: continue
+                
+                # 确保rtsp_url在共享字典中存在
+                if rtsp_url not in inferred_data.keys():
+                    continue
 
                 if rtsp_url not in track_task_status: track_task_status[rtsp_url] = False
                 if rtsp_url not in camera_move_status: camera_move_status[rtsp_url] = None
 
-                detections = bbox_process(rtsp_url)
+                detections = bbox_process(rtsp_url, inferred_data)
 
                 user_selections = user_selection_cache[rtsp_url]
 
@@ -145,7 +162,7 @@ async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user
                     video_id = user_selections['video_id']
 
                     # 转换坐标
-                    frame_bbox = convert_bbox_to_frame_coords(rtsp_url,player_width, player_height, bbox)
+                    frame_bbox = convert_bbox_to_frame_coords(rtsp_url, player_width, player_height, bbox, inferred_data)
                     for detection in detections['detections']['tracking_results']:
                         if is_contained(detection['bounding_box'], frame_bbox):
                             selected_cache[rtsp_url]["video_id"] = video_id # 标记视频通道id
@@ -178,7 +195,7 @@ async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user
                         # 在摄像头移动后，且新的bbox产生后判断一下哪个bbox距离画面中心最近，且和要跟踪的船的ship_type和置信度接近，就将 detection['id'] 替换为这个bbox对应tbox的ship_id
                         for detection in detections['detections']['tracking_results']:
                             # 判断一下哪个bbox距离画面中心最近，且和要跟踪的船的ship_type一样
-                            if try_find_same_ship(rtsp_url, detection['bounding_box'], camera_move_status[rtsp_url].origin_ship_type, detection['label']):
+                            if try_find_same_ship(rtsp_url, detection['bounding_box'], camera_move_status[rtsp_url].origin_ship_type, detection['label'], inferred_data):
                                 # 将 detection['id'] 替换为这个bbox对应tbox的ship_id
                                 selected_cache[rtsp_url]["id"] = detection['id'] # 标记船舶id
                                 detection['user_selected'] = True
@@ -198,22 +215,22 @@ async def response_process_worker(websocket, rtsp_urls, selected_cache:dict,user
 
     except asyncio.CancelledError:
         print(f"Video processing for {rtsp_url} was cancelled.")
-
     finally:
         print(f"Stopped processing video for {rtsp_url}")
 
 
 # 整理并返回推理结果
-def bbox_process(rtsp_url:str) -> np.ndarray:
+def bbox_process(rtsp_url:str, inferred_data) -> np.ndarray:
     current_time_milliseconds = int(time.time() * 1000)
 
-    global inferred_data
-
     # 获取推理结果
-    ship_bboxes = inferred_data[rtsp_url]['ship_bboxes']
-    ship_tboxes = inferred_data[rtsp_url]['ship_tboxes']
-    text_bboxes = inferred_data[rtsp_url]['text_bboxes']
-    ocr_texts = inferred_data[rtsp_url]['ocr_texts']
+    data = inferred_data.get(rtsp_url, {})
+    ship_bboxes = data.get('ship_bboxes', [])
+    ship_tboxes = data.get('ship_tboxes', [])
+    text_bboxes = data.get('text_bboxes', [])
+    ocr_texts = data.get('ocr_texts', [])
+    width = data.get('width', 0)
+    height = data.get('height', 0)
     
     # 创建用于存储结果的字典
     detections = {
@@ -254,8 +271,8 @@ def bbox_process(rtsp_url:str) -> np.ndarray:
         detections["text_detections"].append(text_detection)
 
     detection_data = {
-        "width": inferred_data[rtsp_url]['width'],
-        "height": inferred_data[rtsp_url]['height'],
+        "width": width,
+        "height": height,
         "detections": detections,
         "timestamp": current_time_milliseconds,
     }
@@ -263,13 +280,14 @@ def bbox_process(rtsp_url:str) -> np.ndarray:
     return detection_data
 
 # 找距离画面中心位置最近且类型一致的船
-def try_find_same_ship(rtsp_url, detection_bbox, origin_ship_type, ship_type):
+def try_find_same_ship(rtsp_url, detection_bbox, origin_ship_type, ship_type, inferred_data):
     if origin_ship_type != ship_type: 
         return False
     
-    frame_width=inferred_data[rtsp_url]['width']
-    frame_height=inferred_data[rtsp_url]['height']
-    frame_center = [frame_width/2, frame_height/2]
+    data = inferred_data.get(rtsp_url, {})
+    frame_width = data.get('width', 0)
+    frame_height = data.get('height', 0)
+    frame_center = [frame_width / 2, frame_height / 2]
 
     x1, y1, x2, y2 = detection_bbox
     detection_center = [(x1 + x2) / 2, (y1 + y2) / 2]
@@ -291,9 +309,11 @@ def is_contained(detection_bbox, user_bbox):
     return dx_min >= ux_min and dx_max <= ux_max and dy_min >= uy_min and dy_max <= uy_max
 
 # 坐标转换函数
-def convert_bbox_to_frame_coords(rtsp_url,player_width, player_height, bbox):
-    frame_width=inferred_data[rtsp_url]['width']
-    frame_height=inferred_data[rtsp_url]['height']
+def convert_bbox_to_frame_coords(rtsp_url,player_width, player_height, bbox, inferred_data):
+
+    data = inferred_data.get(rtsp_url, {})
+    frame_width = data.get('width', 0)
+    frame_height = data.get('height', 0)
 
     scale_x = frame_width / player_width
     scale_y = frame_height / player_height
@@ -316,30 +336,31 @@ def callFrameTracking(detection, rtsp_url, target_tbox_id, video_id, camera_move
        
     x1,y1,x2,y2 = detection['bounding_box']
 
-    # rsp = requests.post(
-    #     cctv_frame_track_interface,
-    #     data={
-    #         'camera_id': video_id, # 相机id
-    #         'x_top': x1,
-    #         'y_top': y1,
-    #         'x_bottom': x2,
-    #         'y_bottom': y2,
-    #     },
-    #     verify='./rootCA.crt',  # 导入 rootCA SSL 证书
-    #     timeout=30
-    # )
-    # if rsp.status_code == 200:
-    #     response_data = rsp.json()
-    #     status = response_data.get('status')
-    #     if status == True:
+    rsp = requests.post(
+        cctv_frame_track_interface,
+        json={
+            'cameraId': str(video_id), # 相机id
+            'xTop': str(x1),
+            'yTop': str(y1),
+            'xBottom': str(x2),
+            'yBottom': str(y2),
+        },
+        verify='./rootCA.crt',  # 导入 rootCA SSL 证书
+        timeout=30
+    )
+    # todo 根据 status 处理后续逻辑
+    if rsp.status_code == 200:
+        response_data = rsp.json()
+        status = response_data.get('status')
+        if status == 'true':
             # 假定摄像头运动时间为 2s
-    time.sleep(2)
-    camera_movement_finished(camera_move_status)
-    logging.debug(f'{rtsp_url}:摄像头运动结束了')
-    ship_trackers[rtsp_url].s2c.flag = True
-    ship_trackers[rtsp_url].s2c.target_tbox_id = target_tbox_id
-    # else:
-    #     logging.debug(f"Error: Received status code {rsp.status_code}")
+            time.sleep(2)
+            camera_movement_finished(camera_move_status)
+            logging.debug(f'{rtsp_url}:摄像头运动结束了')
+            # ship_trackers[rtsp_url].s2c.flag = True
+            # ship_trackers[rtsp_url].s2c.target_tbox_id = target_tbox_id
+    else:
+        logging.debug(f"Error: Received status code {rsp.status_code}")
 
 # 标记摄像头移动结束了
 def camera_movement_finished(camera_move_status):
