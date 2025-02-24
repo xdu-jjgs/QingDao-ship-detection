@@ -34,6 +34,10 @@
 - 更新多流多卡逻辑，按gpu个数分配
 - 更新了paddle ocr，舍弃paddle库，改用onnxruntime推理船牌OCR部分
 
+`2025/2/24`:
+
+- 重构了代码（python推理然后把数据放到redis中，然后另起一个nodejs websocekt服务）
+
 ## 推理环境准备
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流

@@ -1,0 +1,35 @@
+需要安装redis, 通信使用的redis地址是 127.0.0.1:6379
+
+# 将 input1.mp4 模拟为光电设备视频流
+ffmpeg -re -stream_loop -1 -i videos/shift2center.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i videos/1.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input2
+ffmpeg -re -stream_loop -1 -i videos/16楼航道近景-1x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input3
+ffmpeg -re -stream_loop -1 -i videos/16-far-x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input4
+
+ffmpeg -re -stream_loop -1 -i videos/infra1.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
+ffmpeg -re -stream_loop -1 -i videos/infra2.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input2
+
+http://127.0.0.1:5000/api/ai/fetchAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input1
+
+# 光电视频回放 API http://127.0.0.1:5000/output.m3u8
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/16楼-远景.mp4
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/20240422-接驳/接驳18.mp4
+http://127.0.0.1:5000/api/ai/fetchAnnotatedMp4?mp4_path=./video/文字检测.mp4
+
+# 停止推流 API
+http://127.0.0.1:5000/api/ai/terminateAnnotatedStream?rtsp_url=rtsp://127.0.0.1:8554/input
+
+python server1.1.py
+python server-WebSockets-Process.py
+
+
+
+
+
+# 执行顺序 example:
+.\mediamtx.exe
+ffmpeg -re -stream_loop -1 -i shift2center.mp4 -c copy -f rtsp rtsp://127.0.0.1:8554/input
+cd .\user_interface\webrtc-streamer-v0.8.5-dirty-Windows-AMD64-Release\
+.\webrtc-streamer.exe
+cd .\user_interface\playground\  
+npm run dev
