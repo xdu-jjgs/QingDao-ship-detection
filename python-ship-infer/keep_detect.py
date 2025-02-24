@@ -8,7 +8,12 @@ import json
 
 from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, TextRecognizer
 from utils import VideoCapture, CameraPos, is_shiptext_in_shipbox, match_shiptext2ship
-from constant import speed_threshold, alarmed_list_max_len, alarmed_list_del_len
+from constant import speed_threshold, alarmed_list_max_len, alarmed_list_del_len, redis_server
+
+import redis
+
+redis_client = redis.StrictRedis(host=redis_server, port=6379)
+channel = "ship_infer"
 
 def save_frame_with_annotations(frame, annotations, filename):
     for annotation in annotations:
@@ -19,7 +24,8 @@ def save_frame_with_annotations(frame, annotations, filename):
     cv2.imwrite(filename, frame)
 
 
-def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers, inferred_data):
+
+def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     
     # todo 根据rtsp_url拆分出要查询那个摄像头的参数-需要cms先设计好光电设备管理的功能
     # ccvt_id, video_id, video_type = url.split('_')
@@ -52,7 +58,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers, inferred_data):
     # 已经报警的 ID 列表
     alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
     # 创建一个用于发送数据
-    # executor = ThreadPoolExecutor(max_workers=5)
+    executor = ThreadPoolExecutor(max_workers=5)
 
     # os.makedirs('snap_shot_dir/over_speed_event', exist_ok=True)
     # os.makedirs('snap_shot_dir/jiebo_event', exist_ok=True)
@@ -72,7 +78,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers, inferred_data):
             if len(alarmed_missing_name_id_lists) > alarmed_list_max_len:
                 del alarmed_missing_name_id_lists[:alarmed_list_del_len]
             
-            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, inferred_data)
+            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer)
             
             # 异常行为检测
             over_speed_ships_id, jiebo_ships_id, missing_name_ships_id = [], [], []
@@ -96,7 +102,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers, inferred_data):
             # print(len(alarmed_over_speed_id_lists), len(alarmed_jiebo_id_lists), len(alarmed_missing_name_id_lists))
 
             # TODO: 调用事件上报接口, 存储图片
-            # timestamp = int(time.time())
+            timestamp = int(time.time())
             # if tobe_alarm_over_spped_id_list:
             #     over_speed_frame = frame.copy()
             #     over_speed_annotations = [ship_dict.get(ship_id).get("bbox") for ship_id in tobe_alarm_over_spped_id_list]
@@ -119,7 +125,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers, inferred_data):
 
 
 # 运行神经网络推理并记录
-def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer, inferred_data):
+def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer):
 
     height, width = frame.shape[:2]
 
@@ -145,16 +151,14 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
         "width": width,
         "height": height,
     }
-    
-    # todo 8路视频并行推理, 每帧数据 100ms-150ms, 3路视频并行推理, 每帧数据 50ms
+
     native_data = convert_to_native_types(data)
-    inferred_data[src_rtsp_url] = native_data
-    
+    redis_client.publish(channel, json.dumps({ "url": src_rtsp_url, "bboxs": native_data}))
+
     logging.debug(f"{src_rtsp_url}推理并记录事件中...")
 
     # 为异常检测添加的返回
     return ship_dict
-
 
 def convert_to_native_types(data):
     if isinstance(data, np.ndarray):

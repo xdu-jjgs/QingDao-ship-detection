@@ -3,8 +3,8 @@
 # 将 input1.mp4 模拟为光电设备视频流
 ffmpeg -re -stream_loop -1 -i videos/shift2center.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
 ffmpeg -re -stream_loop -1 -i videos/1.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input2
-ffmpeg -re -stream_loop -1 -i videos/16楼航道近景-1x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input3
-ffmpeg -re -stream_loop -1 -i videos/16-far-x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input4
+ffmpeg -re -stream_loop -1 -i videos/16楼航道近景-2x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input3
+ffmpeg -re -stream_loop -1 -i videos/16楼-远景x30.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input4
 
 ffmpeg -re -stream_loop -1 -i videos/infra1.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
 ffmpeg -re -stream_loop -1 -i videos/infra2.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input2

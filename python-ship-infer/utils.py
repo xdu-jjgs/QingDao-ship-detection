@@ -71,25 +71,28 @@ class CameraPos:
         url = f'{cctv_parameters_interface}{self.video_id}/'
         while not self.stop_event.is_set():
             try:
-                response = requests.get(url, verify='./rootCA.crt', timeout=30)
-                data = response.json()
-                # print(data)
-                status = data.get('status')
-                parameters = data.get('camera')
-                if status == 'true':
-                    self.tilt = int(parameters['tilt'])
-                    self.pan = int(parameters['pan'])
-                    self.zoom = int(parameters['zoom'])
-                    if self.zoom == 0.0:
-                        self.zoom = 2350
-                    if self.pan == 0.0:
-                        self.pan = 1436
-                    if self.tilt == 0.0:
-                        self.tilt = -243
-                else:
-                    self.tilt = -243
-                    self.pan = 1436
-                    self.zoom = 2350
+                # response = requests.get(url, verify='./rootCA.crt', timeout=30)
+                # data = response.json()
+                # # print(data)
+                # status = data.get('status')
+                # parameters = data.get('camera')
+                # if status == 'true':
+                #     self.tilt = int(parameters['tilt'])
+                #     self.pan = int(parameters['pan'])
+                #     self.zoom = int(parameters['zoom'])
+                #     if self.zoom == 0.0:
+                #         self.zoom = 2350
+                #     if self.pan == 0.0:
+                #         self.pan = 1436
+                #     if self.tilt == 0.0:
+                #         self.tilt = -243
+                # else:
+                #     self.tilt = -243
+                #     self.pan = 1436
+                #     self.zoom = 2350
+                self.tilt = -243
+                self.pan = 1436
+                self.zoom = 2350
 
             except Exception as e:
                 print("Error during GET request:", str(e))

@@ -46,6 +46,9 @@
   - win系统：[Node.js安装与配置（详细步骤）_nodejs安装及环境配置-CSDN博客](https://blog.csdn.net/qq_42006801/article/details/124830995)
   - linux系统：[Linux系统安装Nodejs（详细教程）_linux安装nodejs-CSDN博客](https://blog.csdn.net/qq_45830276/article/details/126022778)
 
+- 安装`redis`：
+https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/
+
 - 性能较强的一到多个 Nvidia GPU，主要用于目标检测模型推理
 - 安装 [CUDA](https://developer.nvidia.com/cuda-downloads)
 - 配置 Python 环境：

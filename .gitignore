@@ -4,5 +4,6 @@ ckpt/
 videos/
 nodejs/
 infer_time/
+snap_shot_dir/
 ffmpeg.exe
 mediamtx.exe

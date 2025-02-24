@@ -3,11 +3,8 @@ import time
 import requests
 import json
 import torch
-import redis
-import numpy as np
 
 from keep_detect import inferOneVideo
-from constant import redis_server
 
 import multiprocessing
 import os
@@ -25,12 +22,12 @@ def terminate_process(pid):
         os.kill(pid, signal.SIGKILL)
 
 # 检查 url 并根据 url 动态创建和关闭线程
-def monitor_urls(urls, ship_trackers, infer_worker_threads, inferred_data):
+def monitor_urls(urls, ship_trackers, infer_worker_threads):
 
     for url_id, url in enumerate(urls):  
         if url not in infer_worker_threads:
             infer_worker_threads[url] = True
-            task_process = multiprocessing.Process(target=inferOneVideo, args=(url, url_id % NUM_GPU, ship_trackers, inferred_data), name='Infer')
+            task_process = multiprocessing.Process(target=inferOneVideo, args=(url, url_id % NUM_GPU, ship_trackers), name='Infer')
             task_process.daemon = True
             task_process.start()
             pid_dict[url] = task_process.pid
@@ -49,33 +46,31 @@ def monitor_urls(urls, ship_trackers, infer_worker_threads, inferred_data):
             print(f"Error removing process for {url}: {e}")
 
 # 测试环境用，直接从 json 文件读取 url
-def load_urls(ship_trackers, infer_worker_threads, inferred_data):
+def load_urls(ship_trackers, infer_worker_threads):
     while True:
         try:
             with open('urls.json', 'r') as f:
                 urls = json.load(f)
-                monitor_urls(urls, ship_trackers, infer_worker_threads, inferred_data)
+                monitor_urls(urls, ship_trackers, infer_worker_threads)
         except Exception:
-            urls = []
+            urls = [
+                "rtsp://127.0.0.1:8554/input1", 
+                "rtsp://127.0.0.1:8554/input2",
+                "rtsp://127.0.0.1:8554/input3",
+                "rtsp://127.0.0.1:8554/input4"
+            ]
+            monitor_urls(urls, ship_trackers, infer_worker_threads)
         
         time.sleep(5)
 
-def get_redis_client():
-    pool = redis.ConnectionPool(host=redis_server, port=6379, db=0)
-    return redis.StrictRedis(connection_pool=pool)
-
-def main(ship_trackers, infer_worker_threads, inferred_data):
+def main(ship_trackers, infer_worker_threads):
     # 启动监控视频地址线程
-    monitor_thread = threading.Thread(target=load_urls, args=(ship_trackers, infer_worker_threads, inferred_data),daemon=True, name='Monitor')
+    monitor_thread = threading.Thread(target=load_urls, args=(ship_trackers, infer_worker_threads),daemon=True, name='Monitor')
     monitor_thread.start()
     
     # Keep the main thread alive
     try:
-        redis_client = get_redis_client()
-        channel = "ship_infer"
         while True:
-            data = dict(inferred_data)
-            redis_client.publish(channel, json.dumps(data))
-            time.sleep(0.03)
+            time.sleep(1)
     except KeyboardInterrupt:
         print("Program terminated by user.")

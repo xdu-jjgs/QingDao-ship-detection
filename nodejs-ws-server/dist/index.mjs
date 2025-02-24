@@ -54,6 +54,7 @@ redis.on("message", (channel, message) => {
   console.warn(`Received from ${channel}, time: ${now - lastReciveMsgTime}`);
   lastReciveMsgTime = now;
   const data = JSON.parse(message);
+  // console.log(data)
   broadcastToAllClient(data.url, data.bboxs);
 });
 const wsClients = /* @__PURE__ */ new Map();

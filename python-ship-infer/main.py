@@ -20,11 +20,8 @@ if __name__ == '__main__':
         # ship_trackers
         ship_trackers = manager.dict()  # { rtsp_url: tracker_info }
         
-        # 推理数据
-        inferred_data = manager.dict()  # { rtsp_url:  {'ship_bboxes': ship_bboxes,'ship_tboxes': ship_tboxes,'text_bboxes': text_bboxes,'ocr_texts': ocr_texts,"width": width,"height": height} }
-
         from run import main
 
-        main(ship_trackers, infer_worker_threads, inferred_data)
+        main(ship_trackers, infer_worker_threads)
     except Exception as e:
         logging.error('发生错误', exc_info=True)
