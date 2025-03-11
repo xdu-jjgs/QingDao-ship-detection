@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import json
 
-from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, TextRecognizer
+from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, TextRecognizer, DepthEstimater
 from utils import VideoCapture, CameraPos, is_shiptext_in_shipbox, match_shiptext2ship
 from constant import speed_threshold, alarmed_list_max_len, alarmed_list_del_len, redis_server
 
@@ -54,6 +54,8 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     ship_tracker.reset()
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id
     # ship_trackers[src_rtsp_url] = ship_tracker
+    # 深度估计
+    depth_estimater = DepthEstimater('./depth_anything_v2_vits.pth', device_id=url_id)
 
     # 已经报警的 ID 列表
     alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
@@ -78,7 +80,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
             if len(alarmed_missing_name_id_lists) > alarmed_list_max_len:
                 del alarmed_missing_name_id_lists[:alarmed_list_del_len]
             
-            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer)
+            ship_dict = getBboxAndRecordEvents(frame, src_rtsp_url, ship_detector, ship_tracker, text_detector, text_recognizer, depth_estimater)
             
             # 异常行为检测
             over_speed_ships_id, jiebo_ships_id, missing_name_ships_id = [], [], []
@@ -125,14 +127,16 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
 
 
 # 运行神经网络推理并记录
-def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer):
+def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer, depth_estimater:DepthEstimater):
 
     height, width = frame.shape[:2]
 
     ship_bboxes = ship_detector(frame)
 
     ship_tboxes = ship_tracker(frame, ship_bboxes)
-
+    # 深度估计
+    ship_tboxes = depth_estimater(frame, ship_tboxes)
+    # print(ship_tboxes)
     text_bboxes = text_detector(frame) if text_detector is not None else []
 
     '''筛选船牌逻辑(YZW)'''

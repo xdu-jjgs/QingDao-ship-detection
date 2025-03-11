@@ -17,7 +17,8 @@ from yolov5.utils.augmentations import letterbox
 from utils import CameraPos, Shift2Center
 from tracker.bytetrack import ByteTrack
 from constant import cls2lbl
-
+from depth_anything_v2.dpt import DepthAnythingV2
+import matplotlib.pyplot as plt
 from easydict import EasyDict
 
 if platform.system() == 'Windows':
@@ -234,8 +235,8 @@ class ShipTracker:
             x0, y0, x1, y1 = int(trk.tlbr[0]), int(trk.tlbr[1]), int(trk.tlbr[2]), int(trk.tlbr[3])
             id = trk.track_id
             cls = trk.cls
-            speed = self.model.get_speed[trk.track_id]
-            distance = self.model.get_distance[trk.track_id]
+            # speed = self.model.get_speed[trk.track_id]
+            # distance = self.model.get_distance[trk.track_id]
             tbox = EasyDict({
                 'x0': x0,
                 'y0': y0,
@@ -244,8 +245,8 @@ class ShipTracker:
                 'x1': x1,
                 'y1': y1,
                 'id': id,
-                'speed': int(speed),
-                'distance': int(distance),
+                'speed': int(-1),
+                'distance': int(-1),
                 'cls': int(cls),
                 'lbl': cls2lbl[int(cls)]
             })
@@ -396,3 +397,78 @@ class TextRecognizer:
         padding_im = np.zeros((imgC, imgH, imgW), dtype=np.float32)
         padding_im[:, :, 0:resized_w] = resized_image
         return padding_im
+    
+
+
+
+
+
+
+
+
+
+class DepthEstimater():
+    '''用于估计场景深度
+    '''
+    def __init__(self, weight: str, device_id: int = 0):
+        self.device = f'cuda:{device_id}'
+        # 基于ViT-S轻量模型
+        model_configs = {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]}
+        self.model = DepthAnythingV2(**model_configs)
+        self.model.load_state_dict(torch.load(weight, map_location='cpu'))
+        self.model = self.model.to(self.device).eval()
+        self.input_size = 518
+        # 抽帧检测间隔
+        self.cnt = 0
+        # id-深度表, 当不更新深度时, 深度沿用同一个Id的深度信息
+        self.id_depth_map = {}
+        # 最大更新间隔, 如果某个id的深度在max_interval帧之后仍未更新, 则在id-深度表中删除该id
+        self.max_interval = 500
+
+    def __call__(self, frame: np.ndarray, t_bboxes: List[dict]) -> List[dict]:
+        # 更新id-深度表
+        self.update_id_depth_map()
+        # 更新船舶的相对深度信息
+        self.updateDepthPerBox(frame, t_bboxes)
+
+        # 更新船舶的深度信息:
+        for t_bbox in t_bboxes:
+            if t_bbox.id in self.id_depth_map:
+                t_bbox.speed = self.id_depth_map[t_bbox.id]['depth']
+        return t_bboxes
+
+
+
+
+    def updateDepthPerBox(self, frame, t_bboxes):
+        if self.cnt % 60 == 0:
+            # 模型推理得到相对深度信息∈[0,1]
+            depth = self.model.infer_image(frame, self.input_size)
+            depth = 1 - (depth - depth.min()) / (depth.max() - depth.min())
+            # 实际距离映射
+            depth = 9 * depth + 1
+            # 更新船舶深度信息
+            for box in t_bboxes:
+                cx = int((box.x0 + box.x1) / 2)
+                cy = int((box.y0 + box.y1) / 2)
+                self.id_depth_map[box.id] = {'depth':depth[cy, cx], 'interval': 0}
+
+            if self.cnt!=0: self.cnt=0
+        self.cnt += 1
+        
+
+    def update_id_depth_map(self, ):
+        '''更新id-深度表
+        '''
+        del_id_list = []
+        for id in self.id_depth_map.keys():
+            self.id_depth_map[id]['interval'] += 1
+            if self.id_depth_map[id]['interval'] > self.max_interval:
+                del_id_list.append(id)
+
+        # 如果某个id的深度在max_interval帧之后仍未更新, 则删除该id
+        for del_id in del_id_list:
+            del self.id_depth_map[del_id]
+            
+
+    

@@ -213,7 +213,8 @@ class ByteTrack(BaseTracker):
     
 
     def get_ratio_pixel_to_real(self):
-        """计算每像素对应的实际距离比例(米/像素)"""
+        """计算每像素对应的实际距离比例(米/像素) 这个代码有问题
+        """
         h_angle = 2 * np.arctan(self.sensor_w / (2 * self.zoom))  # sensor_w(mm), zoom(mm)
         v_angle = 2 * np.arctan(self.sensor_h / (2 * self.zoom))  # sensor_h(mm), zoom(mm)
         
@@ -225,14 +226,15 @@ class ByteTrack(BaseTracker):
         return (real_width / self.image_w) / 1000  # 转换为米/像素
 
     def get_scale(self, loc):
-        '''计算视角导致的距离校正因子'''
+        '''计算视角导致的距离校正因子  这个代码可能也有问题
+        '''
         loc = np.array(loc)
         # 垂直方向校正
         scale_v = np.tan(self.tilt) / np.tan(self.tilt + ((loc[1] - self.image_h/2) / self.image_h) * self.phi_v)
         # 水平方向校正 
         h_angle = np.arctan((loc[0] - self.image_w/2) / (self.image_w/2) * np.tan(self.phi_h))
         scale_h = 1 / np.cos(h_angle)
-        
+        print(f"scale_v:{scale_v}, scale_h:{scale_h}, loc:{loc}")
         return scale_v * scale_h
 
     @property
@@ -240,6 +242,7 @@ class ByteTrack(BaseTracker):
         """计算船舶速度(节)"""
         speed = {}
         time_interval = 1 / self.frame_rate  # 单位：秒
+        # self.get_ratio_pixel_to_real()计算出来有问题，先不用了
         ratio_pixel_to_real = self.get_ratio_pixel_to_real()  # 单位：米/像素
 
         for trk_id, loc in self.loc.items():
@@ -269,29 +272,23 @@ class ByteTrack(BaseTracker):
                         if pixel_distance < 1e-6:  # 避免距离太小
                             continue
                         
-                        real_distance = pixel_distance * ratio_pixel_to_real  # 单位：米
-                        scale = self.get_scale(pos_end)  # 无量纲
-                        
                         # 计算速度：米/秒
                         frames = interval  # 间隔的帧数
-                        speed_ms = real_distance * scale / (frames * time_interval)
-                        
+                        speed_ms = pixel_distance / (frames * time_interval)
                         # 获取该位置对应的摄像头方位角
                         camera_heading = self.get_camera_heading(pos_end)
-                        
                         # 考虑航向对速度的影响
                         heading_factor = np.cos(heading - camera_heading) 
                         speed_ms *= abs(heading_factor)  # 取绝对值避免负速度
                         
                         # 速度范围检查
                         knots = speed_ms * 1.944  # 米/秒 转换为 节
-                        if 0.1 < knots < 120:  # 调整最小速度阈值
+                        if 0.1 < knots < 11120:  # 调整最小速度阈值
                             speeds.append(knots)
                         
                     except Exception as e:
                         print(f"Speed calculation error for interval {interval}: {e}")
                         continue
-                
                 # 取平均值减少波动
                 if speeds:
                     # 使用中位数避免异常值影响
@@ -303,8 +300,13 @@ class ByteTrack(BaseTracker):
             except Exception as e:
                 print(f"Speed calculation error for track {trk_id}: {e}")
                 speed[trk_id] = -1
-
         return speed
+
+
+
+
+
+
 
     @property
     def get_distance(self):

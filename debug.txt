@@ -1,4 +1,7 @@
 需要安装redis, 通信使用的redis地址是 127.0.0.1:6379
+# 首先开启redis
+node ./dist/index.mjs
+
 
 # 将 input1.mp4 模拟为光电设备视频流
 ffmpeg -re -stream_loop -1 -i videos/shift2center.mp4 -vcodec libx264 -f rtsp rtsp://127.0.0.1:8554/input1
