@@ -36,3 +36,23 @@ cd .\user_interface\webrtc-streamer-v0.8.5-dirty-Windows-AMD64-Release\
 .\webrtc-streamer.exe
 cd .\user_interface\playground\  
 npm run dev
+
+
+
+
+
+
+
+
+
+# 配置trt环境
+export PATH=/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/bin:$PATH
+export LD_LIBRARY_PATH=/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LD_LIBRARY_PATH
+export LIBRARY_PATH=/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LIBRARY_PATH
+
+# onnx 2 trt
+python tools/onnx2trt.py -o checkpoints/depth_anything_v2_vits.onnx --output depth_anything_v2_vits.trt --workspace 2
+
+
+# 测试deepanythingv2 tensorrt推理正常:
+python python-ship-infer/depth_anything_v2/trt_models/dpt.py --img python-ship-infer/depth_anything_v2/demo01.jpg --engine python-ship-infer/depth_anything_v2_vits.trt --grayscale

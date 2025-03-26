@@ -1,0 +1,20 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python 调试程序: 当前文件",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/bin:$PATH;export",
+                "LD_LIBRARY_PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LD_LIBRARY_PATH",
+                "LIBRARY_PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LIBRARY_PATH"
+            }
+        }
+    ]
+}

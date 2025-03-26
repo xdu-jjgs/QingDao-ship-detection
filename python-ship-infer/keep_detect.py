@@ -12,6 +12,10 @@ from constant import speed_threshold, alarmed_list_max_len, alarmed_list_del_len
 
 import redis
 
+import copy
+import torch
+
+
 redis_client = redis.StrictRedis(host=redis_server, port=6379)
 channel = "ship_infer"
 
@@ -26,7 +30,7 @@ def save_frame_with_annotations(frame, annotations, filename):
 
 
 def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
-    
+    url_id = url_id
     # todo 根据rtsp_url拆分出要查询那个摄像头的参数-需要cms先设计好光电设备管理的功能
     # ccvt_id, video_id, video_type = url.split('_')
     # print(ccvt_id, video_id, video_type)
@@ -55,6 +59,8 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     # 存储 tracker 对象，用于后续船舶跟踪时修正ship_id
     # ship_trackers[src_rtsp_url] = ship_tracker
     # 深度估计
+    # ./depth_anything_v2_vits.pth
+    # ./depth_anything_v2_vits.trt
     depth_estimater = DepthEstimater('./depth_anything_v2_vits.pth', device_id=url_id)
 
     # 已经报警的 ID 列表
@@ -130,22 +136,23 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
 def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: ShipDetector, ship_tracker: ShipTracker, text_detector: TextDetector, text_recognizer: TextRecognizer, depth_estimater:DepthEstimater):
 
     height, width = frame.shape[:2]
-
+    t1 = time.time()
     ship_bboxes = ship_detector(frame)
-
     ship_tboxes = ship_tracker(frame, ship_bboxes)
     # 深度估计
     ship_tboxes = depth_estimater(frame, ship_tboxes)
-    # print(ship_tboxes)
     text_bboxes = text_detector(frame) if text_detector is not None else []
-
     '''筛选船牌逻辑(YZW)'''
     text_bboxes = is_shiptext_in_shipbox(text_bboxes, ship_bboxes)
-
     ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []
-
     '''匹配船ID和船牌逻辑(YZW)'''
     ship_dict = match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts)
+    t2 = time.time()
+
+    with open ('log.txt', 'a') as txt:
+        txt.write(f'{t2-t1}')
+        txt.write('\n')
+
 
     data = {
         'ship_bboxes': ship_bboxes,
