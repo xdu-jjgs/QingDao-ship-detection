@@ -5,12 +5,13 @@ import time
 import cv2
 import numpy as np
 import json
-
-from model import ShipDetector, LWIRShipDetector, ShipTracker, TextDetector, TextRecognizer, DepthEstimater
+from model import ShipDetector, LWIRShipDetector, ShipTRTDetector, ShipTracker, TextDetector, TextRecognizer, DepthEstimater
 from utils import VideoCapture, CameraPos, is_shiptext_in_shipbox, match_shiptext2ship
 from constant import speed_threshold, alarmed_list_max_len, alarmed_list_del_len, redis_server
 
 import redis
+
+from easydict import EasyDict
 
 import copy
 import torch
@@ -30,7 +31,7 @@ def save_frame_with_annotations(frame, annotations, filename):
 
 
 def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
-    url_id = url_id
+    url_id = 0
     # todo 根据rtsp_url拆分出要查询那个摄像头的参数-需要cms先设计好光电设备管理的功能
     # ccvt_id, video_id, video_type = url.split('_')
     # print(ccvt_id, video_id, video_type)
@@ -48,11 +49,12 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     if src_rtsp_url == 'rtsp://192.168.101.190:554/test_173':
         ship_detector = LWIRShipDetector('./best_ship_det_infra_8_30.pt', device_id=url_id)
     else:
-        ship_detector = ShipDetector('./best_ship_det_m_8_22.pt', device_id=url_id)
+        ship_detector = ShipTRTDetector("best.engine", device_id=url_id)
+        # ship_detector = ShipDetector('./best_ship_det_m_8_22.pt', device_id=url_id)
 
-    if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
-        text_detector = TextDetector('./best_text_det_n_6_19.pt', device_id=url_id)
-        text_recognizer = TextRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt', device_id=url_id)
+    # if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
+    #     text_detector = TextDetector('./best_text_det_n_6_19.pt', device_id=url_id)
+    #     text_recognizer = TextRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt', device_id=url_id)
 
     ship_tracker = ShipTracker(camera_pos)
     ship_tracker.reset()
@@ -61,7 +63,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     # 深度估计
     # ./depth_anything_v2_vits.pth
     # ./depth_anything_v2_vits.trt
-    depth_estimater = DepthEstimater('./depth_anything_v2_vits.pth', device_id=url_id)
+    depth_estimater = DepthEstimater('./depth_anything_v2_vits.engine', device_id=url_id)
 
     # 已经报警的 ID 列表
     alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
@@ -91,16 +93,16 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
             # 异常行为检测
             over_speed_ships_id, jiebo_ships_id, missing_name_ships_id = [], [], []
             
-            for ship_id, ship_info in ship_dict.items():
-                # 检测超速行为
-                if ship_info.get("speed") > speed_threshold:
-                    over_speed_ships_id.append(ship_id)
-                # 检查接驳行为
-                if ship_info.get("cls") == 13:
-                    jiebo_ships_id.append(ship_id)
-                # 检查船牌缺失
-                if ship_info.get("text_bbox_words") is None:
-                    missing_name_ships_id.append(ship_id)
+            # for ship_id, ship_info in ship_dict.items():
+            #     # 检测超速行为
+            #     if ship_info.get("speed") > speed_threshold:
+            #         over_speed_ships_id.append(ship_id)
+            #     # 检查接驳行为
+            #     if ship_info.get("cls") == 13:
+            #         jiebo_ships_id.append(ship_id)
+            #     # 检查船牌缺失
+            #     if ship_info.get("text_bbox_words") is None:
+            #         missing_name_ships_id.append(ship_id)
             
             # TODO: 图片存储的API是同步的，会阻塞主线程，需要改成异步的，并测试效果 
             # 当前报警ID相对于已经报警ID的差集, 对这些差集报警即可，集合为空则不需要报警 
@@ -137,16 +139,22 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
 
     height, width = frame.shape[:2]
     t1 = time.time()
+
+    ship_bboxes = []
+    ship_tboxes = []
+    # ship_bboxes = ship_detector(frame, imgsz=1280)
     ship_bboxes = ship_detector(frame)
+    
     ship_tboxes = ship_tracker(frame, ship_bboxes)
-    # 深度估计
+    # # 深度估计
     ship_tboxes = depth_estimater(frame, ship_tboxes)
-    text_bboxes = text_detector(frame) if text_detector is not None else []
+    # text_bboxes = text_detector(frame) if text_detector is not None else []
     '''筛选船牌逻辑(YZW)'''
-    text_bboxes = is_shiptext_in_shipbox(text_bboxes, ship_bboxes)
-    ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []
+    # text_bboxes = is_shiptext_in_shipbox(text_bboxes, ship_bboxes)
+    # ocr_texts = text_recognizer(frame, text_bboxes) if text_detector is not None else []
     '''匹配船ID和船牌逻辑(YZW)'''
-    ship_dict = match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts)
+    ship_dict = {'':''}
+    # ship_dict = match_shiptext2ship(ship_tboxes, text_bboxes, ocr_texts)
     t2 = time.time()
 
     with open ('log.txt', 'a') as txt:
@@ -157,8 +165,8 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
     data = {
         'ship_bboxes': ship_bboxes,
         'ship_tboxes': ship_tboxes,
-        'text_bboxes': text_bboxes,
-        'ocr_texts': ocr_texts,
+        # 'text_bboxes': text_bboxes,
+        # 'ocr_texts': ocr_texts,
         "width": width,
         "height": height,
     }

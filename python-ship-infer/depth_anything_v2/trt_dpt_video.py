@@ -54,16 +54,17 @@ class Dpt:
         cuda.init()
         self._batch_size = batch_size
         self._device_ctx = cuda.Device(gpu_idx).make_context()
-        # print(self._device_ctx)
-        # self._engine = self._load_engine(trt_file)
-        # self._context = self._engine.create_execution_context()
-        # if not dynamic_shape:
-        #     (
-        #         self._input,
-        #         self._output,
-        #         self._bindings,
-        #         self._stream,
-        #     ) = self._allocate_buffers(self._context)
+        print(self._device_ctx)
+        self._engine = self._load_engine(trt_file)
+        self._context = self._engine.create_execution_context()
+        if not dynamic_shape:
+            (
+        
+                self._input,
+                self._output,
+                self._bindings,
+                self._stream,
+            ) = self._allocate_buffers(self._context)
 
         logger.info("Dpt model <loaded>...")
 

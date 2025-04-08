@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import math
 
+from ultralytics import YOLO
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.general import non_max_suppression, scale_boxes
 from yolov5.utils.augmentations import letterbox
@@ -40,6 +41,7 @@ class LWIRShipDetector:
         self.imgsz = 1280
         self.score_thres = 0.25
         self.iou_thres = 0.3
+        print(f"初始化LWIRShipDetector成功!!!!!, gpu = {self.device}")
 
     def __call__(self, frame: np.ndarray) -> List[dict]:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -107,6 +109,7 @@ class ShipDetector:
         self.imgsz = 1280
         self.score_thres = 0.25
         self.iou_thres = 0.3
+        print(f"初始化ShipDetector成功!!!!!, gpu = {self.device}")
 
     def __call__(self, frame: np.ndarray) -> List[dict]:
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -117,6 +120,8 @@ class ShipDetector:
         
         pred = self.model(img_processed, augment=False)[0]
         pred = non_max_suppression(pred, self.score_thres, self.iou_thres, agnostic=True)[0].detach().cpu()
+        
+        
         pred = np.array(pred)
         pred = self._judgeJieBo(pred)
 
@@ -187,6 +192,111 @@ class ShipDetector:
                 iou_matrix[i, j] = intersection_area / union_area if union_area != 0 else 0
 
         return iou_matrix
+
+
+
+
+
+
+
+# 船舶检测模型
+class ShipTRTDetector:
+    def __init__(self, weight: str, device_id: int = 0):
+        # 不知道为啥 select_device 无论是0还是1结果都是0，所以不要这个函数。干脆手动设置
+        # self.device = select_device(str(device_id))
+        self.device = f'cuda:{device_id}'
+        self.model = YOLO("best.engine", task="detect")
+        self.imgsz = 1280
+        self.score_thres = 0.25
+        self.iou_thres = 0.7
+        print(f"初始化ShipTRTDetector成功!!!!!, gpu = {self.device}")
+
+    def __call__(self, frame: np.ndarray) -> List[dict]:
+        results = self.model(frame, imgsz=self.imgsz, device=self.device, verbose=False, conf=self.score_thres, iou=self.iou_thres)
+        xywh_array = results[0].boxes.xywh.cpu().numpy().astype(np.int32)
+        conf_array = results[0].boxes.conf.cpu().numpy().astype(np.float32)
+        cls_array = results[0].boxes.cls.cpu().numpy().astype(np.int32)
+        bboxes = []
+        for i, xywh in enumerate(xywh_array):
+            box = EasyDict({
+                'x0': int(xywh[0]),
+                'y0': int(xywh[1]),
+                'w': int(xywh[2]),
+                'h': int(xywh[3]),
+                'x1': int(xywh[0] + xywh[2]),
+                'y1': int(xywh[1] + xywh[3]),
+                'prob': float(conf_array[i]),
+                'cls': int(cls_array[i]),
+                'lbl': results[0].names[cls_array[i]]
+            })
+            bboxes.append(box)
+
+        return bboxes
+    
+    # 添加接驳行为判断逻辑，并将接驳也当做新的一类
+    def _judgeJieBo(self, predict_boxes):
+        tugboats_boxes = predict_boxes[np.where(predict_boxes[:, 5]==6)[0]]
+        other_boxes = predict_boxes[np.where(predict_boxes[:, 5]!=6)[0]]
+
+        iou_matrix = self._bboxIoU(other_boxes[:, :4], tugboats_boxes[:, :4])
+        # 遍历每艘船:
+        jiebo_bboxes = []
+        for id, iou in enumerate(iou_matrix):
+            tugboats_boxes_this = tugboats_boxes[np.where(iou>0)[0]]
+            if tugboats_boxes_this.shape[0]==0:continue
+            JB_all = np.concatenate((tugboats_boxes_this, other_boxes[id][None]), axis=0)
+            x_min = int(min(JB_all[:, 0]))
+            y_min = int(min(JB_all[:, 1]))
+            x_max = int(max(JB_all[:, 2]))
+            y_max = int(max(JB_all[:, 3]))
+            jiebo_bboxes.append([x_min, y_min, x_max, y_max, 1.0, 13])
+        
+        if len(jiebo_bboxes) > 0:
+            predict_boxes = np.concatenate([predict_boxes, jiebo_bboxes], axis=0)
+        return predict_boxes
+    
+
+    def _bboxIoU(self, boxesa, boxesb):
+        """
+        Calculate the Intersection over Union (IoU) of two sets of boxes.
+        Args:
+        boxesa (np.array): array of bounding boxes, shape = [n, 4], format [x0, y0, x1, y1]
+        boxesb (np.array): array of bounding boxes, shape = [m, 4], format [x0, y0, x1, y1]
+
+        Returns:
+        np.array: IoU scores, shape = [n, m]
+        """
+        n = boxesa.shape[0]
+        m = boxesb.shape[0]
+        iou_matrix = np.zeros((n, m))
+
+        for i in range(n):
+            for j in range(m):
+                boxa = boxesa[i]
+                boxb = boxesb[j]
+                # Calculate intersection
+                x0 = max(boxa[0], boxb[0])
+                y0 = max(boxa[1], boxb[1])
+                x1 = min(boxa[2], boxb[2])
+                y1 = min(boxa[3], boxb[3])
+                intersection_area = max(0, x1 - x0) * max(0, y1 - y0)
+                # Calculate union
+                boxa_area = (boxa[2] - boxa[0]) * (boxa[3] - boxa[1])
+                boxb_area = (boxb[2] - boxb[0]) * (boxb[3] - boxb[1])
+                union_area = boxa_area + boxb_area - intersection_area
+                # Calculate IoU
+                iou_matrix[i, j] = intersection_area / union_area if union_area != 0 else 0
+
+        return iou_matrix
+
+
+
+
+
+
+
+
+
 
 # 船舶跟踪模型
 class ShipTracker:
@@ -270,6 +380,7 @@ class TextDetector:
         self.imgsz = 1280
         self.score_thres = 0.25
         self.iou_thres = 0.3
+        print(f"初始化TextDetector成功!!!!!, gpu = {self.device}")
 
     def __call__(self, frame: np.ndarray) -> List[dict]:
 
@@ -331,6 +442,7 @@ class TextRecognizer:
         for i, char in enumerate(dict_character):
             self.dict[char] = i
         self.character = dict_character
+        print(f"初始化TextRecognizer成功!!!!!, gpu = {device_id}")
 
     def __call__(self, frame: np.ndarray, text_bboxes: List[dict]) -> List[str]:
         '''获取识别结果
@@ -350,7 +462,6 @@ class TextRecognizer:
         '''
         preds_idx = preds.argmax(axis=2)
         # preds_prob = preds.max(axis=2)
-        # print(preds_idx.shape, preds_prob.shape)
         text = self.decode(preds_idx)
         return text
 
@@ -412,80 +523,17 @@ class TextRecognizer:
 
 
 
-class DepthEstimater():
-    '''用于估计场景深度
-    '''
-    def __init__(self, weight: str, device_id: int = 0):
-        self.device = f'cuda:{device_id}'
-        # 基于ViT-S轻量模型
-        model_configs = {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]}
-        self.model = DepthAnythingV2(**model_configs)
-        self.model.load_state_dict(torch.load(weight, map_location='cpu'))
-        self.model = self.model.to(self.device).eval()
-        self.input_size = 518
-        # 抽帧检测间隔
-        self.cnt = 0
-        # id-深度表, 当不更新深度时, 深度沿用同一个Id的深度信息
-        self.id_depth_map = {}
-        # 最大更新间隔, 如果某个id的深度在max_interval帧之后仍未更新, 则在id-深度表中删除该id
-        self.max_interval = 500
-
-    def __call__(self, frame: np.ndarray, t_bboxes: List[dict]) -> List[dict]:
-        # 更新id-深度表
-        self.update_id_depth_map()
-        # 更新船舶的相对深度信息
-        self.updateDepthPerBox(frame, t_bboxes)
-
-        # 更新船舶的深度信息:
-        for t_bbox in t_bboxes:
-            if t_bbox.id in self.id_depth_map:
-                t_bbox.speed = self.id_depth_map[t_bbox.id]['depth']
-        return t_bboxes
-
-
-
-
-    def updateDepthPerBox(self, frame, t_bboxes):
-        if self.cnt % 60 == 0:
-            # 模型推理得到相对深度信息∈[0,1]
-            depth = self.model.infer_image(frame, self.input_size)
-            depth = 1 - (depth - depth.min()) / (depth.max() - depth.min())
-            # 实际距离映射
-            depth = 9 * depth + 1
-            # 更新船舶深度信息
-            for box in t_bboxes:
-                cx = int((box.x0 + box.x1) / 2)
-                cy = int((box.y0 + box.y1) / 2)
-                self.id_depth_map[box.id] = {'depth':depth[cy, cx], 'interval': 0}
-
-            if self.cnt!=0: self.cnt=0
-        self.cnt += 1
-        
-
-    def update_id_depth_map(self, ):
-        '''更新id-深度表
-        '''
-        del_id_list = []
-        for id in self.id_depth_map.keys():
-            self.id_depth_map[id]['interval'] += 1
-            if self.id_depth_map[id]['interval'] > self.max_interval:
-                del_id_list.append(id)
-
-        # 如果某个id的深度在max_interval帧之后仍未更新, 则删除该id
-        for del_id in del_id_list:
-            del self.id_depth_map[del_id]
-            
-
-    
-
 # class DepthEstimater():
 #     '''用于估计场景深度
 #     '''
 #     def __init__(self, weight: str, device_id: int = 0):
 #         self.device = f'cuda:{device_id}'
 #         # 基于ViT-S轻量模型
-#         if weight == './depth_anything_v2_vits.trt':
-#             self.model = Dpt(weight, gpu_id=device_id, img_size=518)
+#         model_configs = {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]}
+#         self.model = DepthAnythingV2(**model_configs)
+#         self.model.load_state_dict(torch.load(weight, map_location='cpu'))
+#         self.model = self.model.to(self.device).eval()
+#         self.input_size = 518
 #         # 抽帧检测间隔
 #         self.cnt = 0
 #         # id-深度表, 当不更新深度时, 深度沿用同一个Id的深度信息
@@ -511,16 +559,15 @@ class DepthEstimater():
 #     def updateDepthPerBox(self, frame, t_bboxes):
 #         if self.cnt % 60 == 0:
 #             # 模型推理得到相对深度信息∈[0,1]
-#             frame, shape_info = self.model.preprocess(frame)
-#             depth_res = self.model.inference(frame)
-#             depth = self.model.postprocess(shape_info, depth_res)
+#             depth = self.model.infer_image(frame, self.input_size)
+#             depth = 1 - (depth - depth.min()) / (depth.max() - depth.min())
+#             # 实际距离映射
+#             depth = 9 * depth + 1
 #             # 更新船舶深度信息
 #             for box in t_bboxes:
 #                 cx = int((box.x0 + box.x1) / 2)
 #                 cy = int((box.y0 + box.y1) / 2)
-#                 # 实际距离映射
-#                 transform_depth = 9 * (1 - depth[cy, cx] / 255.) + 1
-#                 self.id_depth_map[box.id] = {'depth':transform_depth, 'interval': 0}
+#                 self.id_depth_map[box.id] = {'depth':depth[cy, cx], 'interval': 0}
 
 #             if self.cnt!=0: self.cnt=0
 #         self.cnt += 1
@@ -538,3 +585,67 @@ class DepthEstimater():
 #         # 如果某个id的深度在max_interval帧之后仍未更新, 则删除该id
 #         for del_id in del_id_list:
 #             del self.id_depth_map[del_id]
+            
+
+    
+
+class DepthEstimater():
+    '''用于估计场景深度
+    '''
+    def __init__(self, weight: str, device_id: int = 0):
+        self.device = f'cuda:{device_id}'
+        # 基于ViT-S轻量模型
+        self.model = Dpt(weight, gpu_id=device_id, img_size=518)
+        # 抽帧检测间隔
+        self.cnt = 0
+        # id-深度表, 当不更新深度时, 深度沿用同一个Id的深度信息
+        self.id_depth_map = {}
+        # 最大更新间隔, 如果某个id的深度在max_interval帧之后仍未更新, 则在id-深度表中删除该id
+        self.max_interval = 500
+        print(f"初始化DepthEstimater成功!!!!!, gpu = {self.device}")
+
+    def __call__(self, frame: np.ndarray, t_bboxes: List[dict]) -> List[dict]:
+        # 更新id-深度表
+        self.update_id_depth_map()
+        # 更新船舶的相对深度信息
+        self.updateDepthPerBox(frame, t_bboxes)
+
+        # 更新船舶的深度信息:
+        for t_bbox in t_bboxes:
+            if t_bbox.id in self.id_depth_map:
+                t_bbox.speed = self.id_depth_map[t_bbox.id]['depth']
+        return t_bboxes
+
+
+
+
+    def updateDepthPerBox(self, frame, t_bboxes):
+        if self.cnt % 60 == 0:
+            # 模型推理得到相对深度信息∈[0,1]
+            frame, shape_info = self.model.preprocess(frame)
+            depth_res = self.model.inference(frame)
+            depth = self.model.postprocess(shape_info, depth_res)
+            # 更新船舶深度信息
+            for box in t_bboxes:
+                cx = int((box.x0 + box.x1) / 2)
+                cy = int((box.y0 + box.y1) / 2)
+                # 实际距离映射
+                transform_depth = 9 * (1 - depth[cy, cx] / 255.) + 1
+                self.id_depth_map[box.id] = {'depth':transform_depth, 'interval': 0}
+
+            if self.cnt!=0: self.cnt=0
+        self.cnt += 1
+        
+
+    def update_id_depth_map(self, ):
+        '''更新id-深度表
+        '''
+        del_id_list = []
+        for id in self.id_depth_map.keys():
+            self.id_depth_map[id]['interval'] += 1
+            if self.id_depth_map[id]['interval'] > self.max_interval:
+                del_id_list.append(id)
+
+        # 如果某个id的深度在max_interval帧之后仍未更新, 则删除该id
+        for del_id in del_id_list:
+            del self.id_depth_map[del_id]

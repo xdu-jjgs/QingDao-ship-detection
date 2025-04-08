@@ -7,3 +7,6 @@ infer_time/
 snap_shot_dir/
 ffmpeg.exe
 mediamtx.exe
+*.trt
+*.engine
+*.pth

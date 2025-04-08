@@ -51,8 +51,18 @@ export LD_LIBRARY_PATH=/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-Tens
 export LIBRARY_PATH=/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LIBRARY_PATH
 
 # onnx 2 trt
-python tools/onnx2trt.py -o checkpoints/depth_anything_v2_vits.onnx --output depth_anything_v2_vits.trt --workspace 2
+python tools/onnx2trt.py -o checkpoints/depth_anything_v2_vits.onnx --output depth_anything_v2_vits.engine --workspace 2
 
 
 # 测试deepanythingv2 tensorrt推理正常:
 python python-ship-infer/depth_anything_v2/trt_models/dpt.py --img python-ship-infer/depth_anything_v2/demo01.jpg --engine python-ship-infer/depth_anything_v2_vits.trt --grayscale
+
+
+
+
+
+
+debug记录_2025_4_3: 目前把船牌检测和识别那部分注释了，只留着船舶检测和depth，然后现在的问题是depth单独推理不报错，和yolo一起推就报序列化的错误
+解决方案:把yolo推理也改成trt推理，不使用pytorch推理
+debug记录_2025_4_7: yolo的trt版本和deepanything的trt版本似乎有冲突，两者放在一起推会报错 AttributeError: 'NoneType" object has no attribute 'create execution context
+解决方案:export的trt模型的版本和推理时的trt版本得一致(假如export用的trt8.4, 那推理就得是8.4不能是8.5)
