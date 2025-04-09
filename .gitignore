@@ -1,6 +1,6 @@
 sh.txt
 __pycache__/
-ckpt/
+ckpts/
 videos/
 nodejs/
 infer_time/
@@ -10,3 +10,4 @@ mediamtx.exe
 *.trt
 *.engine
 *.pth
+*.pt

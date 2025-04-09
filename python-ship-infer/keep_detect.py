@@ -49,11 +49,11 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     if src_rtsp_url == 'rtsp://192.168.101.190:554/test_173':
         ship_detector = LWIRShipDetector('./best_ship_det_infra_8_30.pt', device_id=url_id)
     else:
-        ship_detector = ShipTRTDetector("best.engine", device_id=url_id)
-        # ship_detector = ShipDetector('./best_ship_det_m_8_22.pt', device_id=url_id)
+        ship_detector = ShipTRTDetector("./ckpts/best.engine", device_id=url_id)
+        # ship_detector = ShipDetector('./ckpts/best_ship_det_m_8_22.pt', device_id=url_id)
 
     # if src_rtsp_url != 'rtsp://192.168.101.190:554/test_173':
-    #     text_detector = TextDetector('./best_text_det_n_6_19.pt', device_id=url_id)
+    #     text_detector = TextDetector('./ckpts/best_text_det_n_6_19.pt', device_id=url_id)
     #     text_recognizer = TextRecognizer('./ppocr/model.onnx', './ppocr/ppocr_keys_v1.txt', device_id=url_id)
 
     ship_tracker = ShipTracker(camera_pos)
@@ -63,7 +63,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     # 深度估计
     # ./depth_anything_v2_vits.pth
     # ./depth_anything_v2_vits.trt
-    depth_estimater = DepthEstimater('./depth_anything_v2_vits.engine', device_id=url_id)
+    depth_estimater = DepthEstimater('./ckpts/depth_anything_v2_vits.engine', device_id=url_id)
 
     # 已经报警的 ID 列表
     alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
