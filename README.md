@@ -38,6 +38,13 @@
 
 - 重构了代码（python推理然后把数据放到redis中，然后另起一个nodejs websocekt服务）
 
+`2025/4/9`:
+
+- 利用deepanythingv2进行深度估计(后续用于速度估计)，并采用trt推理
+
+- 替换船舶检测模型为yolov8，trt推理
+- 目前的问题：单卡的环境下推理没问题(卡0没问题卡1会报错)，多卡的情况也会报错
+
 ## 推理环境准备
 
 - 性能较强的多核 CPU，主要用于 ffmpeg 推流
@@ -63,6 +70,45 @@ conda activate QD_ship_det
 
 ```
 conda install pytorch==1.13.0 torchvision==0.14.0 pytorch-cuda=11.7 -c pytorch -c nvidia
+```
+
+YOLOv8环境
+
+```
+pip install ultralytics
+```
+
+tensorrt环境(**注意tensorrt版本对环境要求较高，和cuda，cudnn版本相关，需严格一致**)
+
+cudnn:[cuDNN Archive | NVIDIA Developer](https://developer.nvidia.com/rdp/cudnn-archive)
+
+tensorrt:[NVIDIA TensorRT 8.x Download | NVIDIA Developer](https://developer.nvidia.com/nvidia-tensorrt-8x-download)
+
+```
+cuda12.1 cudnn8.6.0 tensorrt8.6.1
+```
+
+yolov8导出为trt
+
+https://docs.ultralytics.com/modes/export/#key-features-of-export-mode 参考文档
+
+```python
+import os
+from ultralytics import YOLO
+
+ckpt_path = "./xxx.pt"
+model = YOLO(ckpt_path)
+# Export the model
+model.export(format="engine", imgsz=1280, half=True, device='cuda:0')
+
+```
+
+deep-anythingv2(深度估计模块)导出为trt
+
+基于仓库：[zhujiajian98/Depth-Anythingv2-TensorRT-python: Transform the depth-anything-v2 model to tensorrt.](https://github.com/zhujiajian98/Depth-Anythingv2-TensorRT-python)
+
+```
+python tools/onnx2trt.py -o checkpoints/depth_anything_v2_vits.onnx --output depth_anything_v2_vits.engine --workspace 2
 ```
 
 **其他依赖**
