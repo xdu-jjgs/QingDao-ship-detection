@@ -9,12 +9,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal",
-            "env": {
-                "PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/bin:$PATH;export",
-                "LD_LIBRARY_PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LD_LIBRARY_PATH",
-                "LIBRARY_PATH": "/media/F/yangzewei/QingDao_projrect/Depth-Anythingv2-TensorRT-python/tensorrt8517/TensorRT-8.5.1.7/lib:$LIBRARY_PATH"
-            }
+            "console": "integratedTerminal"
+            "justMyCode": false
         }
     ]
 }

@@ -4,10 +4,10 @@ from easydict import EasyDict
 import numpy as np
 
 # Load the exported TensorRT model
-tensorrt_model = YOLO("best.engine")
+tensorrt_model = YOLO("/media/F/yangzewei/QingDao_projrect/QingDao-ship-detection/python-ship-infer/ckpts/best.engine")
 
 # Run inference
-results = tensorrt_model("1.png", imgsz=1280, device=1)
+results = tensorrt_model("1.png", imgsz=1280, device="cuda:1")
 
 xywh_array = results[0].boxes.xywh.cpu().numpy().astype(np.int32)
 conf_array = results[0].boxes.conf.cpu().numpy().astype(np.float32)

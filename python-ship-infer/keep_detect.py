@@ -64,6 +64,7 @@ def inferOneVideo(src_rtsp_url: str, url_id: int, ship_trackers):
     # ./depth_anything_v2_vits.pth
     # ./depth_anything_v2_vits.trt
     depth_estimater = DepthEstimater('./ckpts/depth_anything_v2_vits.engine', device_id=url_id)
+    # depth_estimater = None
 
     # 已经报警的 ID 列表
     alarmed_over_speed_id_lists, alarmed_jiebo_id_lists, alarmed_missing_name_id_lists = [], [], []
@@ -145,7 +146,10 @@ def getBboxAndRecordEvents(frame: np.ndarray, src_rtsp_url: str, ship_detector: 
     # ship_bboxes = ship_detector(frame, imgsz=1280)
     ship_bboxes = ship_detector(frame)
     
+    
     ship_tboxes = ship_tracker(frame, ship_bboxes)
+    
+    
     # # 深度估计
     ship_tboxes = depth_estimater(frame, ship_tboxes)
     # text_bboxes = text_detector(frame) if text_detector is not None else []

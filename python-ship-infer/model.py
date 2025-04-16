@@ -30,6 +30,8 @@ if platform.system() == 'Windows':
     pathlib.PosixPath = pathlib.WindowsPath
 
 
+import constant
+
 
 # 长波红外船舶检测模型
 class LWIRShipDetector:
@@ -204,15 +206,19 @@ class ShipTRTDetector:
     def __init__(self, weight: str, device_id: int = 0):
         # 不知道为啥 select_device 无论是0还是1结果都是0，所以不要这个函数。干脆手动设置
         # self.device = select_device(str(device_id))
+        # cudart.cudaSetDevice(device_id)
+        self.device_id = device_id
         self.device = f'cuda:{device_id}'
-        self.model = YOLO("best.engine", task="detect")
+        self.model = YOLO(weight, task="detect")
         self.imgsz = 1280
         self.score_thres = 0.25
         self.iou_thres = 0.7
         print(f"初始化ShipTRTDetector成功!!!!!, gpu = {self.device}")
 
     def __call__(self, frame: np.ndarray) -> List[dict]:
+        # cudart.cudaSetDevice(self.device_id)
         results = self.model(frame, imgsz=self.imgsz, device=self.device, verbose=False, conf=self.score_thres, iou=self.iou_thres)
+        
         xywh_array = results[0].boxes.xywh.cpu().numpy().astype(np.int32)
         conf_array = results[0].boxes.conf.cpu().numpy().astype(np.float32)
         cls_array = results[0].boxes.cls.cpu().numpy().astype(np.int32)
@@ -620,18 +626,34 @@ class DepthEstimater():
 
 
     def updateDepthPerBox(self, frame, t_bboxes):
+        max_depth = constant.camera_max_depth
+        min_depth = constant.camera_min_depth
+        sea_percent = constant.camera_sea_percent
+        
         if self.cnt % 60 == 0:
             # 模型推理得到相对深度信息∈[0,1]
             frame, shape_info = self.model.preprocess(frame)
             depth_res = self.model.inference(frame)
             depth = self.model.postprocess(shape_info, depth_res)
+            
+            
+            sea_rel = depth[int(depth.shape[0]*(1-sea_percent)), 0]
+            screen_down_rel = depth[int(depth.shape[0] - 1), 0]
+            
             # 更新船舶深度信息
             for box in t_bboxes:
                 cx = int((box.x0 + box.x1) / 2)
                 cy = int((box.y0 + box.y1) / 2)
                 # 实际距离映射
-                transform_depth = 9 * (1 - depth[cy, cx] / 255.) + 1
-                self.id_depth_map[box.id] = {'depth':transform_depth, 'interval': 0}
+                
+                radio_ship = (screen_down_rel - depth[cy, cx]) / (screen_down_rel - sea_rel)
+                depth_ship = (max_depth - min_depth) * radio_ship + min_depth
+                
+                # transform_depth = 9 * (1 - depth[cy, cx] / 255.) + 1
+
+                
+
+                self.id_depth_map[box.id] = {'depth': depth_ship, 'interval': 0}
 
             if self.cnt!=0: self.cnt=0
         self.cnt += 1
